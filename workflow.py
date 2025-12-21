@@ -77,10 +77,11 @@ def videogen(clips=1,image_path="", prompt="",folder="neon",source_image_review=
         #read the animation prompt from file
         with open(result['animation_prompt'], 'r') as f:
             animation_prompt = f.read()
+
         #get the final image path
         end_image = result['image_final']
         #create a new prompt for VLM model
-        prompt = f"The image you are looking at is the LAST FRAME of a video that was generated with this prompt: {animation_prompt}. Continue the clip using the image as inspiration for how to continue. First, Review the image. Then create a new prompt for the text-to-video AI to Extend the video and create a longer video clip.  Here is an example prompt: Focus strictly on subject Motion/activity + Camera motion, in that order. You do Not need to describe the subject visually as the animation model takes that from the input image. use brackets for emphasis [ ]. here is an example \nThey are having sex, fucking, thrusts in and out. [penis moves in and out of her vagina], dripping white cum and ejaculation. her ass bouncing, breast jiggle, she maintains eye contact with camera. The hips of the man and woman move in rythem opposite directions. Camera [dolly in] slow\n. Create an appropriate erotic sex movie prompt for the input image.\n\nCreate a NEW prompt that continues the image action/motion + camera view"
+        prompt = f"The image you are looking at is the LAST FRAME of a video that was generated with this prompt: {animation_prompt}. Continue the clip using the image as inspiration for how to continue. First, Review the image. Then create a new prompt for the text-to-video AI to Extend the video and create a longer video clip, MOVE SCENE TOWARDS EJACULATION or CUM or ORGASIM. Motion terms (dynamic motion, spreading motion, thrusting motion, intense motion, vigorously moving hips, ), Camera terms  (pan left/right,tilt up/down,dolly in/out,crane up). \n basic prompt structure: Opening shot -> Camera motion -> Final. \nFocus strictly on subject Motion/activity + Camera motion, in that order. You do Not need to describe the subject visually as the animation model takes that from the input image. use brackets for emphasis [ ].\n\n Here is an example \nThey are having sex, [penis moves in and out of her vagina], her ass bouncing, breast jiggle, she maintains eye contact with viewer, Orbital arc, dolly in, dripping white cum and ejaculation from vagina.\nHere is another example: The man's penis moves in rythemically in and out of her mouth, she is giving him a (blowjob) Camera [dolly in] slow,  seminal fluid starts to drip from her mouth \n.  Create an appropriate erotic sex movie prompt for the input image.\n\nCreate a NEW prompt that continues the image action/motion + camera view"
         #set next image and prompt if we need it
         animation_prompt = qwen_generate(prompt, images=[end_image])
         start_image = end_image
@@ -105,13 +106,13 @@ def workflow(seed="student teen", img_count=5, lighting="rays of sunlight", scen
     prompt_attempts = 0
     max_prompt_attempts = 5
     video_clip_extensions = 3
-    img_prompt_prefix = "photograph, photo of " #"Artistic Animation"
+    img_prompt_prefix = "photograph, of " #"Artistic Animation"
     img_prompt_suffix = " 8k" #"3D Render,high quality"
     
     while not image_prompt_list or prompt_attempts > max_prompt_attempts:
         print("Generating prompts...")
         # Step 1: Create character model traits
-        char_model_prompt = f"I want you to create a NEW and UNIQUE {seed} inspired model idea. Should be a sexy female. the eyes,lips, hair, breast tags DO NOT have the tag word inside the tags we are only defining that feature. Use SIMPLE short 1 or 2 word descriptions, except for hair that can be longer, space is limited, base is always 'the girl'.  Example Return schema:\n<base>the girl</base>\n<skin>light freckles</skin>\n<hair>face-framing blond hair with bangs</hair>\n<face>sharp features</face>\n<eyes>black mascara</eyes>\n<lips>full</lips>\n<breasts>small</breasts>\nReturn a NEW character using the schema"
+        char_model_prompt = f"I want you to create a NEW and UNIQUE {seed} inspired model idea. There are key attributes you need to assign. Base examples (the athletic woman, the girl, the skinny teen, the petite girl, the fit woman, ...), Skin examples: (asain, white, light, ebony, freckles, fair, ...). Hair examples: (wafting chestnut waves, straight blond, platinum blonde, brown ponytails, bixi-cut face framing, short straight black with bangs, long auburn curls, etc). Face examples: (sharp cheekbones, round features, high cheeks, hard angled brow, dimples, etc.),  Breast examples (small, perky, large, full, 32A, 36D, 32B, medium, voluptuous , etc). You are defining a sexy female. the eyes,lips, hair, breast tags ARE NOT stated inside the tags defining that feature. Use SIMPLE short 1 or 2 word descriptions, except for hair that can be longer, space is limited.  Example Return schema:\n<base>the girl</base>\n<skin>freckles</skin>\n<hair>face-framing frosted hair with bangs</hair>\n<face>sharp features</face>\n<eyes>glasses</eyes>\n<lips>thin</lips>\n<breasts>supple</breasts>\nReturn a NEW character using the schema"
         char_model = qwen_generate(char_model_prompt, model_type=default_model_type)
         print(f"Character Model: {char_model}")
 
@@ -136,12 +137,12 @@ def workflow(seed="student teen", img_count=5, lighting="rays of sunlight", scen
             <people>1girl 1man</people><shot>she is on (all fours) hips back, his caucasian penis ejaculates (cum) in to her open mouth. Medium close-up overhead shot, POV</shot>\
             <people>1girl 1man</people><shot>she is on her stomach, her hips and ass are raised, her vagina exposed, his white dick sexual penetration of her vagina from behind, she is looking back over her shoulder. Looking down at her from behind</shot>\
             <people>1girl</people><shot>both of her legs are raised, vagina (labia) showing, she is pulling her buttocks cheeks spreading her vagina. Extreme close up, focus on her vagina</shot>\
-            <people>1girl 1man</people><shot>she is lying on her side, one leg raised, the man is having sex with her, he penis is inside her vagina. Side view</shot>\
-            <people>1girl</people><shot>she is sitting one knee is raised, leaning, (chest forward), wearing pink lace panties and bra, she is looking at viewer. Front view Close-up</shot>\
-            <people>1girl 1man</people><shot>she is sitting on heals,with butt next to heals, his legs are spread and his penis is in her mouth (deepthroat) blowjob. Low view</shot>\
             <people>1girl</people><shot>she is sitting in a (provocative) pose, arms back, chest forward. Medium shot front view </shot>\
             <people>1girl 1man</people><shot>she is squating, arms between her legs, chin raised mouth open, his penis is (ejaculating) loads of semen in to her mouth and on her chest. Side profile shot</shot>\
             <people>1girl</people><shot>she is standing, one hand on her hip wearing pink lace panties and bra, she is looking (seductively) at viewer. Full body shot</shot>\
+            <people>1girl 1man</people><shot>she is lying on her side, one leg raised, the man is having sex with her, he penis is inside her vagina. Side view</shot>\
+            <people>1girl</people><shot>she is sitting one knee is raised, leaning, (chest forward), wearing pink lace panties and bra, she is looking at viewer. Front view Close-up</shot>\
+            <people>1girl 1man</people><shot>she is sitting on heals,with butt next to heals, his legs are spread and his penis is in her mouth (deepthroat) blowjob. Low view</shot>\
         ...generate {img_count} new shot"
         shots = qwen_generate(shots_prompt,model_type=default_model_type)
         print(f"Shots: {shots}")
@@ -186,8 +187,6 @@ def workflow(seed="student teen", img_count=5, lighting="rays of sunlight", scen
         print(f"\nImage Review Result:\n {review_result}\n")
         print("\n", "*"*50)
         
-        # Unload model between reviews to avoid VRAM issues
-        _ = _unload_model()
         
         images_paths.append({'img_path': impath, 'review_result': review_result, 'image_prompt': image_prompt})
         print(f"\nReview complete for: {impath}\n")
@@ -207,7 +206,7 @@ def workflow(seed="student teen", img_count=5, lighting="rays of sunlight", scen
 
     #unload the image model and free VRAM
     _ = _unload_image_generate()
-    _ =_unload_model()
+    
 
 
     #ANIMATION Prompt Generation.
@@ -222,14 +221,16 @@ def workflow(seed="student teen", img_count=5, lighting="rays of sunlight", scen
         result = qwen_generate(animation_prompt, images=[img_path])
         print("\n","#"*50)
         print(f"Create movie clip for:  {img_path}")
-        #release to help with VRAM
-        _ =_unload_model()
+        
 
         #Generate Movies
         #res = i2v(image_path=img_path, prompt=result,folder=shoot_folder,source_image_review=img_info['review_result'],source_image_prompt=image_prompt)
         res = videogen(clips=video_clip_extensions,image_path=img_path, prompt=result,folder=shoot_folder,source_image_review=img_info['review_result'],source_image_prompt=image_prompt)
         print(res)
         print("-"*50)
+    
+    #release to help with VRAM
+    _ =_unload_model()
         
     
 
@@ -444,12 +445,16 @@ def _random_woman():
 
 if __name__ == "__main__":
     start_time = time.time()
+    #7.5 Hour RUN TIME LIMIT TEST
+    #scenes_count = 5
+    #images_per_run = 8
+
     scenes_count = 5
-    images_per_run = 8
+    images_per_run = 10
 
     # Run multiple workflow iterations with different seeds
-    last_result = {"subject":f"{_random_woman()}", "lighting":f"{_random_lighting()}", "scene":f"{_random_scene()}","name":"lush_425"}
-    second_last_result = {"subject":f"{_random_woman()}", "lighting":f"{_random_lighting()}", "scene":f"{_random_scene()}","name":"juciy_861"}
+    last_result = {"subject":f"{_random_woman()}", "lighting":f"{_random_lighting()}", "scene":f"{_random_scene()}","name":"rome"}
+    second_last_result = {"subject":f"{_random_woman()}", "lighting":f"{_random_lighting()}", "scene":f"{_random_scene()}","name":"london"}
     for run_iter in range(scenes_count):
 
         try:
@@ -459,7 +464,7 @@ if __name__ == "__main__":
             print("="*20)
             print("="*60)
 
-            seed_prompt = f"""You need to come up with pornographic arrousing ideas (beach, hotel, rooftop penthouse, couch, van, etc.) I need a SUBJECT of 3 or 4 words, just them NOT what they are wearing. A LIGHTTING style of 2 or 3 words, and a SCENE of 3 to 5 words, lastly I need a reference name for the idea. Here is an example return schema:\
+            seed_prompt = f"""You need to come up with pornographic nsfw arrousing ideas (hotel room, bedroom, couch, hot tub, etc.) I need a SUBJECT of 3 or 4 words, just them NOT what they are wearing. A LIGHTTING style of 2 or 3 words, and a SCENE of 3 to 5 words, lastly I need a reference city name for the idea. Here is an example return schema:\
                     {json.dumps(last_result)}. Here is another example: {json.dumps(second_last_result)}. Now create a new unique creative and sexy idea return the schema."""
             char_model = qwen_generate(seed_prompt, model_type='lm')
             print(f"Shoot Idea: {char_model}")
@@ -479,6 +484,12 @@ if __name__ == "__main__":
                 last_result = seed_data
             else:
                 second_last_result = seed_data
+
+            scene_time = time.time()
+            print("="*60,"\n")
+            print(f"Scene {run_iter+1} completed in {scene_time - start_time:.2f} seconds.")
+            print("="*60,"\n")
+
         except Exception as e:
             print(f"Error generating seed data: {e}")
             continue

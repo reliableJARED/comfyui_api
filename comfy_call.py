@@ -140,11 +140,14 @@ class ComfyCall:
             workflow[self.PROMPT_NODE_ID]["inputs"]["text"] = prompt_text
 
             # Update Negative Prompt Node
-            workflow[self.NEGATIVE_PROMPT_NODE_ID]["inputs"]["text"] = "hands, chewing, biting, eating, messy, distorted, deformed, disfigured, ugly, tiling, poorly drawn, mutation, mutated, extra limbs, cloned face, disfigured, out of frame, ugly, blurry, bad anatomy, bad proportions, extra limbs, cloned face, disfigured, gross proportions, malformed limbs, missing arms, missing legs, fused fingers, too many fingers, long neck"
+            workflow[self.NEGATIVE_PROMPT_NODE_ID]["inputs"]["text"] = "gay, transvestite, hands, chewing, biting, eating, messy, distorted, deformed, disfigured, ugly, tiling, poorly drawn, mutation, mutated, extra limbs, cloned face, disfigured, out of frame, ugly, blurry, bad anatomy, bad proportions, extra limbs, cloned face, disfigured, gross proportions, malformed limbs, missing arms, missing legs, fused fingers, too many fingers, long neck"
             
             # Randomize Seed (so you don't get the exact same video every time)
             if self.SEED_NODE_ID in workflow:
-                workflow[self.SEED_NODE_ID]["inputs"]["noise_seed"] = random.randint(1, 1000000000)
+
+                #USING A STATIC SEED FOR TESTING PURPOSES
+                
+                workflow[self.SEED_NODE_ID]["inputs"]["noise_seed"] = 5555555 #random.randint(1, 1000000000)
             
             # 4. Queue the Workflow
             response = self.queue_prompt(workflow)
