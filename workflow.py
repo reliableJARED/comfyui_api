@@ -111,7 +111,7 @@ def workflow(seed="student teen", img_count=5, lighting="rays of sunlight", scen
     while not image_prompt_list or prompt_attempts > max_prompt_attempts:
         print("Generating prompts...")
         # Step 1: Create character model traits
-        char_model_prompt = f"I want you to create a NEW and UNIQUE {seed} inspired model idea. Should be a sexy female. the eyes,lips, hair, breast tags MUST always have the tag word also inside the tags if defining that feature, the tags target areas not direct changes. Use SIMPLE short descriptions, base is always 'the girl'.  Example Return schema:\n<base>the girl</base>\n<skin>light freckles</skin>\n<hair>face-framing blond hair with bangs</hair>\n<face>sharp facial features</face>\n<eyes>glasses, black mascara</eyes>\n<lips>full lips</lips>\n<breasts>small breasts</breasts>\nReturn a NEW character using the schema"
+        char_model_prompt = f"I want you to create a NEW and UNIQUE {seed} inspired model idea. Should be a sexy female. the eyes,lips, hair, breast tags DO NOT have the tag word inside the tags we are only defining that feature. Use SIMPLE short 1 or 2 word descriptions, except for hair that can be longer, space is limited, base is always 'the girl'.  Example Return schema:\n<base>the girl</base>\n<skin>light freckles</skin>\n<hair>face-framing blond hair with bangs</hair>\n<face>sharp features</face>\n<eyes>black mascara</eyes>\n<lips>full</lips>\n<breasts>small</breasts>\nReturn a NEW character using the schema"
         char_model = qwen_generate(char_model_prompt, model_type=default_model_type)
         print(f"Character Model: {char_model}")
 
@@ -131,7 +131,7 @@ def workflow(seed="student teen", img_count=5, lighting="rays of sunlight", scen
         print(f"Lighting: {current_lighting}")
 
         # Step 3: Generate action, camera angles, and shots
-        shots_prompt = f"Generate a list of exactly {img_count}, sexy, intimate, explicit actions and camera angle descriptions, for a nsfw shoot for the scene locations: {scene_concept}. USE EXPLICIT medical based LANGUAGE (penis, vagina, anus, etc.) terms since the image generator needs detail. A few she should have this clothing: {clothing}.Use parentheses () to emphasize a word. Use camera shoot terms, must keep things brief there are limits on the prompt. ONLY people count, action and angles no other information. example Return schema: \
+        shots_prompt = f"Generate a list of exactly {img_count}, sexy, intimate, explicit actions and camera angle descriptions, for a nsfw shoot for the scene locations: {scene_concept}. USE EXPLICIT medical based LANGUAGE (penis, vagina, anus, etc.) terms since the image generator needs detail. A few she should have this clothing: {clothing}.Use parentheses () to emphasize a word. Be brief tokens keep the action + camera description under 25 words - CRITICAL, .Use camera shoot terms, must keep things brief there are limits on the prompt. ONLY people count, action and angles no other information. example Return schema: \
             <people>1girl</people><shot>she is lying on her back (orgasiming), delighted face expression. Full body shot top down</shot>\
             <people>1girl 1man</people><shot>she is on (all fours) hips back, his caucasian penis ejaculates (cum) in to her open mouth. Medium close-up overhead shot, POV</shot>\
             <people>1girl 1man</people><shot>she is on her stomach, her hips and ass are raised, her vagina exposed, his white dick sexual penetration of her vagina from behind, she is looking back over her shoulder. Looking down at her from behind</shot>\
@@ -297,7 +297,7 @@ def extract_prompt(xml_prompt, expected_tags=None, min_shots=10):
             
             for key in ['base', 'skin', 'hair', 'face', 'eyes', 'lips', 'breasts']:
                 if tag_values.get(key):
-                    parts.append(tag_values[key])
+                    parts.append(tag_values[key]+" "+key)
             
             #if clothing: parts.append(clothing) #CLOTHING INJECTED IN SCENE DIRECTLY NOW
             
@@ -437,7 +437,9 @@ if __name__ == "__main__":
 
         try:
             print("="*60)
-            print(f"\n","="*20,f" RUN ITERATION {run_iter+1} ","\n","="*20)
+            print("="*20)
+            print("="*20,f" > > > RUNNING SCENE {run_iter+1}")
+            print("="*20)
             print("="*60)
 
             seed_prompt = f"""You need to come up with pornographic arrousing ideas (beach, hotel, rooftop penthouse, couch, van, etc.) I need a SUBJECT of 3 or 4 words, just them NOT what they are wearing. A LIGHTTING style of 2 or 3 words, and a SCENE of 3 to 5 words, lastly I need a reference name for the idea. Here is an example return schema:\
