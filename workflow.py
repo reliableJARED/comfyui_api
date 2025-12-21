@@ -23,10 +23,11 @@ import os
 import random
 from comfy_call import ComfyCall
 import json
+from join_mp4 import combine_videos
 
 COMFY = ComfyCall()
 
-def i2v(image_path="", prompt="",folder="neon", source_image_review="", source_image_prompt=""):
+def i2v(image_path="", prompt="",folder="neon", source_image_review="", source_image_prompt="",file_name_modifier="1"):
     global COMFY
     """
     Generate a video from an image and prompt using ComfyCall.
@@ -42,13 +43,59 @@ def i2v(image_path="", prompt="",folder="neon", source_image_review="", source_i
         folder=folder,
         source_image_review=source_image_review,
         source_image_prompt=source_image_prompt,
-        base_file_name=base_filename_noext
+        base_file_name=base_filename_noext,
+        file_name_modifier=file_name_modifier
     )
     return result
     
+def videogen(clips=1,image_path="", prompt="",folder="neon",source_image_review="", source_image_prompt=""):
+    #this function will generate successive videos from a single image and prompt attempting to create a longer animation
+    animation_prompt = prompt
+    start_image = image_path
+    counter = 0
+    all_files = []
+    video_clips = []
+    while counter < clips:
+        counter += 1
+        print(f"Generating clip {counter} of {clips}...")
+        #first generate initial video
+        result = i2v(image_path=start_image, prompt=prompt, folder=folder,source_image_review=source_image_review, source_image_prompt=source_image_prompt,file_name_modifier=f"{counter}")
+        """result = {'video': 'path_to_video',
+                    'image_final': 'path_to_final_image',
+                    'animation_prompt': 'path_to_animation_prompt.txt',
+                    'source_image_prompt': 'path_to_source_image_prompt.txt',
+                    'source_image_review': 'path_to_source_image_review.txt',
+                    'image_start': 'path_to_input_image'}
+        """
+        all_files.append(result)
+        video_clips.append(result['video'])
+
+        #check if we have at least one more clip to generate, else break we are done
+        if counter >= clips:
+            break
+
+        #read the animation prompt from file
+        with open(result['animation_prompt'], 'r') as f:
+            animation_prompt = f.read()
+        #get the final image path
+        end_image = result['image_final']
+        #create a new prompt for VLM model
+        prompt = f"The image you are looking at is the LAST FRAME of a video that was generated with this prompt: {animation_prompt}. Continue the clip using the image as inspiration for how to continue. First, Review the image. Then create a new prompt for the text-to-video AI to Extend the video and create a longer video clip.  Here is an example prompt: Focus strictly on subject Motion/activity + Camera motion, in that order. You do Not need to describe the subject visually as the animation model takes that from the input image. use brackets for emphasis [ ]. here is an example \nThey are having sex, fucking, thrusts in and out. [penis moves in and out of her vagina], dripping white cum and ejaculation. her ass bouncing, breast jiggle, she maintains eye contact with camera. The hips of the man and woman move in rythem opposite directions. Camera [dolly in] slow\n. Create an appropriate erotic sex movie prompt for the input image.\n\nCreate a NEW prompt that continues the image action/motion + camera view"
+        #set next image and prompt if we need it
+        animation_prompt = qwen_generate(prompt, images=[end_image])
+        start_image = end_image
+
+    # Extract base filename from first video (all share same unique number prefix)
+    base_file_name = os.path.splitext(os.path.basename(video_clips[0]))[0].rsplit('_', 1)[0]
+    output_dir = os.path.dirname(video_clips[0])
+    #merge all the video clips
+    full_video_filename = os.path.join(output_dir, f"{base_file_name}_full_video.mp4")
+    combine_videos(video_clips, full_video_filename)
+    return all_files    
+
 
 def workflow(seed="student teen", img_count=5, lighting="rays of sunlight", scene="library study room", shoot_folder="library"):
-    default_model_type = 'lm'  # 'vlm' or 'lm' for language model only
+    default_model_type = 'vlm'  # 'vlm' or 'lm' for language model only
     img_count = img_count  # Number of images/shots to generate
     seed = seed#"student teen"  # Example seed word for character model
     lighting = lighting#"rays of sunlight"  # Example lighting description
@@ -57,13 +104,14 @@ def workflow(seed="student teen", img_count=5, lighting="rays of sunlight", scen
     image_prompt_list = False
     prompt_attempts = 0
     max_prompt_attempts = 5
-    img_prompt_prefix = "Artistic Animation"#f"photograph, photo of {seed}, {lighting}"
-    img_prompt_suffix = "3D Render,high quality"#,UHD,8k
+    video_clip_extensions = 3
+    img_prompt_prefix = "photograph, photo of " #"Artistic Animation"
+    img_prompt_suffix = "UHD,8k" #"3D Render,high quality"
     
     while not image_prompt_list or prompt_attempts > max_prompt_attempts:
         print("Generating prompts...")
         # Step 1: Create character model traits
-        char_model_prompt = f"I want you to create a NEW and UNIQUE {seed} inspired model idea. I generally like white or fair skin, slender, skinny or fit. she should be a sexy female. the lips tage always needs the word lips in it. Use SIMPLE short 3 word or less descriptions base is always 'the girl'.  Example Return schema:\n<base>the girl</base>\n<skin>white skin</skin>\n<hair>face-framing blond hair</hair>\n<face>sharp features</face>\n<eyes>glasses, black mascara</eyes>\n<lips>full lips</lips>\n<breasts>small breasts</breasts>\nReturn a NEW schema use exactly the same tags."
+        char_model_prompt = f"I want you to create a NEW and UNIQUE {seed} inspired model idea. Should be a sexy female. the eyes,lips, hair, breast tags MUST always have the tag word also inside the tags if defining that feature, the tags target areas not direct changes. Use SIMPLE short descriptions, base is always 'the girl'.  Example Return schema:\n<base>the girl</base>\n<skin>light freckles</skin>\n<hair>face-framing blond hair with bangs</hair>\n<face>sharp facial features</face>\n<eyes>glasses, black mascara</eyes>\n<lips>full lips</lips>\n<breasts>small breasts</breasts>\nReturn a NEW character using the schema"
         char_model = qwen_generate(char_model_prompt, model_type=default_model_type)
         print(f"Character Model: {char_model}")
 
@@ -71,24 +119,29 @@ def workflow(seed="student teen", img_count=5, lighting="rays of sunlight", scen
         clothing = qwen_generate(clothing_prompt, model_type=default_model_type)
         print(f"Clothing: {clothing}")
 
-        # Step 2: Create scene concept
-        scene_concept_prompt = f"create a short 7 or less word scene description for a pornographic photoshoot. Here is an Example Return schema: \
+        # Step 2: Create scene concept - NOT ACTUALLY USED NOW
+        scene_concept_prompt = f"create a short scene description for a pornographic photoshoot. Here is an Example Return schema: \
             <scene>In a library isle, bookshelves</scene> Return a new schema in scene tags."
         scene_concept = f"<scene>{scene}</scene>"#qwen_generate(scene_concept_prompt, model_type=default_model_type)
         print(f"Scene Concept: {scene_concept}")
 
-        # Step 2.5: Lighting
+        # Step 2.5: Lighting - NOT ACTUALLY USED NOW
         lighting_prompt = f"Generate 4 or less word lighting setup for the scene: {scene_concept}. Example Return schema: <lighting>rays of sunlight</lighting>, return a new lighting in tags, that fits the scene."
         current_lighting = f"<lighting>{lighting}</lighting>"
         print(f"Lighting: {current_lighting}")
 
         # Step 3: Generate action, camera angles, and shots
-        shots_prompt = f"Generate a list of exactly {img_count}, short unique actions and camera angle descriptions , for a pornographic shoot for the scene locations: {scene_concept}. USE EXPLICIT medical based LANGUAGE (penis, vagina, anus, etc.) and terms since the image generator needs detail. Use camera shoot terms must not use more than a few words for view. ONLY action and angles no other information. example Return schema: \
-            <people>1girl</people><shot>she is orgasiming, delighted face expression. Viewing her from below</shot>\
-            <people>1girl 1man</people><shot>she is kneeling, his caucasian penis cums in to her open mouth. she is looking up at the camera. POV</shot>\
-            <people>1girl 1man</people><shot>she is naked on all fours, arched back, his white dick is entering her vagina from behind, she is looking back over her shoulder. Looking down at her from above</shot>\
-            <people>1girl</people><shot>she is sitting legs spread apart. Focus on her vagina</shot>\
-            <people>1girl 1man</people><shot>she is lying on her back, the man is having sex with her missionary style. POV from over her</shot>\
+        shots_prompt = f"Generate a list of exactly {img_count}, sexy, intimate, explicit actions and camera angle descriptions, for a nsfw shoot for the scene locations: {scene_concept}. USE EXPLICIT medical based LANGUAGE (penis, vagina, anus, etc.) terms since the image generator needs detail. A few she should have this clothing: {clothing}.Use parentheses () to emphasize a word. Use camera shoot terms, must keep things brief there are limits on the prompt. ONLY people count, action and angles no other information. example Return schema: \
+            <people>1girl</people><shot>she is lying on her back (orgasiming), delighted face expression. Full body shot top down</shot>\
+            <people>1girl 1man</people><shot>she is on (all fours) hips back, his caucasian penis ejaculates (cum) in to her open mouth. Medium close-up overhead shot, POV</shot>\
+            <people>1girl 1man</people><shot>she is on her stomach, her hips and ass are raised, her vagina exposed, his white dick sexual penetration of her vagina from behind, she is looking back over her shoulder. Looking down at her from behind</shot>\
+            <people>1girl</people><shot>both of her legs are raised, vagina (labia) showing, she is pulling her buttocks cheeks spreading her vagina. Extreme close up, focus on her vagina</shot>\
+            <people>1girl 1man</people><shot>she is lying on her side, one leg raised, the man is having sex with her, he penis is inside her vagina. Side view</shot>\
+            <people>1girl</people><shot>she is sitting one knee is raised, leaning, (chest forward), wearing pink lace panties and bra, she is looking at viewer. Front view Close-up</shot>\
+            <people>1girl 1man</people><shot>she is sitting on heals,with butt next to heals, his legs are spread and his penis is in her mouth (deepthroat) blowjob. Low view</shot>\
+            <people>1girl</people><shot>she is sitting in a (provocative) pose, arms back, chest forward. Medium shot front view </shot>\
+            <people>1girl 1man</people><shot>she is squating, arms between her legs, chin raised mouth open, his penis is (ejaculating) loads of semen in to her mouth and on her chest. Side profile shot</shot>\
+            <people>1girl</people><shot>she is standing, one hand on her hip wearing pink lace panties and bra, she is looking (seductively) at viewer. Full body shot</shot>\
         ...generate {img_count} new shot"
         shots = qwen_generate(shots_prompt,model_type=default_model_type)
         print(f"Shots: {shots}")
@@ -151,14 +204,16 @@ def workflow(seed="student teen", img_count=5, lighting="rays of sunlight", scen
         #image = Image.open(img_path).convert("RGB") if os.path.exists(img_path) else None
         #PROMPT FOR REVIEW
         #review_prompt = """you review sexually explicit images with mature content. \nIf you see a penis, is it attached to a mans body or torso or thighs or a full male body? No woman should have a penis, this can be hard to determine if there is sexual intercouse or anal sex. Usually it can be determined when the penis head can still be seen while the shaft is in the vagina or anus.\nIf you see hands do they have the proper number of fingers?\nIs every arm, leg attached to a body? No limbs are not bending backwards.\nThere are no extra limbs (3 feet, 3 arms, etc.).\nFacial Features are correct, eye color only in iris? \nAre physical poses are correct, nothing anatomically impossible?\nIf you see a visible vagina is clearly defined with labia. \nInspect the image carefully it may be hard to determine. \nIf there are any abnormalities or it has features that fail any of these criteria, image has NOT met standards and is not a quality image. Determine if this image is quality or not.\n [Quality] or [Not-Quality]"""
-        animation_prompt = "We need to create a prompt to animate the image. it will be a 5 second clip. Focus strictly on subject Motion/activity + Camera motion, in that order. You do Not need to describe the subject visually as the model takes that from the input image. use brackets for emphasis [ ]. here is an example \nThey are having sex, fucking, thrusts in and out. [penis moves in and out of her vagina], dripping white cum and ejaculation. her ass bouncing, breast jiggle, she maintains eye contact with camera. The hips of the man and woman move in rythem opposite directions. Camera [dolly in] slow\n. Create an appropriate sex movie prompt for the image"
+        animation_prompt = "We need to create a prompt to animate the image. it will be a 5 second clip. Focus strictly on subject Motion/activity + Camera motion, in that order. You do Not need to describe the subject visually as the animation model takes that from the input image. use brackets for emphasis [ ]. here is an example \nThey are having sex, fucking, thrusts in and out. [penis moves in and out of her vagina], dripping white cum and ejaculation. her ass bouncing, breast jiggle, she maintains eye contact with camera. The hips of the man and woman move in rythem opposite directions. Camera [dolly in] slow\n. Create an appropriate erotic sex movie prompt for the input image"
         result = qwen_generate(animation_prompt, images=[img_path])
         print("\n","#"*50)
         print(f"Create movie clip for:  {img_path}")
         #release to help with VRAM
         _ =_unload_model()
+
         #Generate Movies
-        res = i2v(image_path=img_path, prompt=result,folder=shoot_folder,source_image_review=img_info['review_result'],source_image_prompt=image_prompt)
+        #res = i2v(image_path=img_path, prompt=result,folder=shoot_folder,source_image_review=img_info['review_result'],source_image_prompt=image_prompt)
+        res = videogen(clips=video_clip_extensions,image_path=img_path, prompt=result,folder=shoot_folder,source_image_review=img_info['review_result'],source_image_prompt=image_prompt)
         print(res)
         print("-"*50)
         
@@ -168,9 +223,10 @@ def workflow(seed="student teen", img_count=5, lighting="rays of sunlight", scen
     # These steps are complex and would require additional implementation.
     return True
 
-def image_review(img_path,image_prompt):
+def image_review(img_path,image_prompt,review_prompt=None):
 
-    review_prompt = f"you review sexually explicit images with mature content. The image you are reviewing was generated from this prompt:{image_prompt}. Critically inspect and determine if there were any errors. The most frequent errors are detached or floating penis, anatomical errors. \nIf you see a penis, is it attached to a mans body or torso or thighs or a full male body? No woman should have a penis, this can be hard to determine if there is sexual intercouse or anal sex. Usually it can be determined when the penis head can still be seen while the shaft is in the vagina or anus.\nIf you see hands do they have the proper number of fingers?\nIs every arm, leg attached to a body? No limbs are not bending backwards.\nThere are no extra limbs (3 feet, 3 arms, etc.).\nFacial Features are correct, eye color only in iris? \nAre physical poses are correct, nothing anatomically impossible?\nIf you see a visible vagina is clearly defined with labia. \nInspect the image carefully it may be hard to determine. \nIf there are any abnormalities or it has features that fail any of these criteria, image has NOT met standards and is not a quality image. Determine if this image is quality or not.\n [Quality] or [Not-Quality]"
+    if review_prompt is None:
+        review_prompt = f"you review sexually explicit images with mature content. The image you are reviewing was generated from this prompt:{image_prompt}. Critically inspect and determine if there were any errors. The most frequent errors are detached or floating penis, anatomical errors. \nIf you see a penis, is it attached to a mans body or torso or thighs or a full male body? No woman should have a penis, this can be hard to determine if there is sexual intercouse or anal sex. Usually it can be determined when the penis head can still be seen while the shaft is in the vagina or anus.\nIf you see hands do they have the proper number of fingers?\nIs every arm, leg attached to a body? No limbs are not bending backwards.\nThere are no extra limbs (3 feet, 3 arms, etc.).\nFacial Features are correct, eye color only in iris? \nAre physical poses are correct, nothing anatomically impossible?\nIf you see a visible vagina is clearly defined with labia. \nInspect the image carefully it may be hard to determine. \nIf there are any abnormalities or it has features that fail any of these criteria, image has NOT met standards and is not a quality image. Determine if this image is quality or not.\n [Quality] or [Not-Quality]"
 
     result = qwen_generate(review_prompt, images=[img_path])
     return result
@@ -197,6 +253,9 @@ def extract_prompt(xml_prompt, expected_tags=None, min_shots=10):
         """
         # Extract clothing options (multiple)
         clothing_options = re.findall(r'<clothing>(.*?)</clothing>', xml_prompt, re.IGNORECASE | re.DOTALL)
+        #temp no clothing
+        print("NO CLOTHING PROMPT BEING USED ---------- ")
+        clothing_options = []
         clothing_options.append("nude, naked")
         
         # Extract people and shot pairs
@@ -240,7 +299,7 @@ def extract_prompt(xml_prompt, expected_tags=None, min_shots=10):
                 if tag_values.get(key):
                     parts.append(tag_values[key])
             
-            if clothing: parts.append(clothing)
+            #if clothing: parts.append(clothing) #CLOTHING INJECTED IN SCENE DIRECTLY NOW
             
             for key in ['scene', 'lighting']:
                 if tag_values.get(key):
@@ -307,21 +366,21 @@ def _random_scene():
         "beach at sunset",
         "rooftop penthouse",
         "luxury spa",
-        "strip club",
+        #"strip club",
         "library study room",
         "hotel room with view",
         "private yacht deck",
         "tropical waterfall",
-        "deserted island shore",
-        "modern art gallery",
+        #"deserted island shore",
+        #"modern art gallery",
         "cozy mountain cabin",
-        "urban loft apartment",
+        #"urban loft apartment",
         "mideval castle courtyard",
-        "futuristic cityscape",
+        #"futuristic cityscape",
         "secluded forest glade",
-        "vintage diner",
-        "tavern with fireplace",
-        "sunlit garden",
+        #"vintage diner",
+        #"tavern with fireplace",
+        #"sunlit garden",
     ]
     return random.choice(scenes)
 
@@ -331,7 +390,7 @@ def _random_lighting():
         "soft morning light",
         "dramatic spotlight",
         "candlelight glow",
-        "golden hour sunlight",
+        #"golden hour sunlight",
         "dim lighting",
         "twilight ambiance",
         "moonlit night",
@@ -346,20 +405,21 @@ def _random_woman():
         "young woman",
         "teen girl",
         "adult female",
-        "exotic beauty",
-        "sensual lady",
-        "prostitue nightwalker",
+        #"exotic beauty",
+        #"sensual lady",
+        #"prostitue nightwalker",
         "stripper dancer",
         "fashion model",
         "roman goddess",
+        "fairy tale princess",
         "beach babe",
         "fitness model",
-        "artistic model",
-        "bohemian beauty",
-        "elegant lady",
-        "sultry siren",
-        "mysterious femme fatale",
-        "classic pin-up girl",
+        #"artistic model",
+        #"bohemian beauty",
+        #"elegant lady",
+        #"sultry siren",
+        #"mysterious femme fatale",
+        #"classic pin-up girl",
         "confident businesswoman",
         "free-spirited traveler",
     ]
@@ -367,18 +427,20 @@ def _random_woman():
 
 if __name__ == "__main__":
     start_time = time.time()
-    scenes_count = 2
-    images_per_run = 3
+    scenes_count = 5
+    images_per_run = 8
 
     # Run multiple workflow iterations with different seeds
-    last_result = {"subject":f"{_random_woman()}", "lighting":f"{_random_lighting()}", "scene":f"{_random_scene()}","name":"kenzi_475"}
-    second_last_result = {"subject":f"{_random_woman()}", "lighting":f"{_random_lighting()}", "scene":f"{_random_scene()}","name":"juki_920"}
+    last_result = {"subject":f"{_random_woman()}", "lighting":f"{_random_lighting()}", "scene":f"{_random_scene()}","name":"lush_425"}
+    second_last_result = {"subject":f"{_random_woman()}", "lighting":f"{_random_lighting()}", "scene":f"{_random_scene()}","name":"juciy_861"}
     for run_iter in range(scenes_count):
 
         try:
-            print(f"\n\n=== RUN ITERATION {run_iter+1} ===")
+            print("="*60)
+            print(f"\n","="*20,f" RUN ITERATION {run_iter+1} ","\n","="*20)
+            print("="*60)
 
-            seed_prompt = f"""You need to come up with pornographic arrousing ideas (beach, hotel, rooftop penthouse, couch, van, etc.) I need a SUBJECT of 3 or 4 words, just them NOT what they are wearing. A LIGHTTING style of 2 or 3 words, and a SCENE of 3 to 5 words, lastly I need a single word to name the idea. Here is an example return schema:\
+            seed_prompt = f"""You need to come up with pornographic arrousing ideas (beach, hotel, rooftop penthouse, couch, van, etc.) I need a SUBJECT of 3 or 4 words, just them NOT what they are wearing. A LIGHTTING style of 2 or 3 words, and a SCENE of 3 to 5 words, lastly I need a reference name for the idea. Here is an example return schema:\
                     {json.dumps(last_result)}. Here is another example: {json.dumps(second_last_result)}. Now create a new unique creative and sexy idea return the schema."""
             char_model = qwen_generate(seed_prompt, model_type='lm')
             print(f"Shoot Idea: {char_model}")

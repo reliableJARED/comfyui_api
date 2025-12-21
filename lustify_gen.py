@@ -46,7 +46,7 @@ class ImageGenerator:
         if self.animated:
             self.model_name="UnfilteredAI/NSFW-GEN-ANIME"
         else:  
-            self.model_name="LyliaEngine/Pony_Diffusion_V6_XL"#"TheImposterImposters/LUSTIFY-v4.0"
+            self.model_name="TheImposterImposters/LUSTIFY-v4.0"
         
         # Enhanced device configuration for Mac and CUDA
         self.device = self._get_best_device(use_mps, use_cuda)

@@ -89,7 +89,7 @@ class ComfyCall:
             self.ws.close()
 
     #def run(self, input_image_path, prompt_text, folder="movies"):
-    def run(self, input_image_path, prompt_text, base_file_name="base_file_name",folder="movies",source_image_review="",source_image_prompt=""):
+    def run(self, input_image_path, prompt_text, base_file_name="base_file_name",folder="movies",source_image_review="",source_image_prompt="",file_name_modifier=""):
         """
         Executes the full workflow:
         1. Connects to WebSocket
@@ -98,6 +98,15 @@ class ComfyCall:
         4. Queues job
         5. Waits for completion
         6. Downloads results
+
+        returns a dictionary of saved file paths.
+        Structure of returned saved_file paths:
+                {'video': 'path_to_video',
+                 'image_final': 'path_to_final_image',
+                 'animation_prompt': 'path_to_animation_prompt.txt',
+                 'source_image_prompt': 'path_to_source_image_prompt.txt',
+                 'source_image_review': 'path_to_source_image_review.txt',
+                 'image_start': 'path_to_input_image'}
         """
         #add timeout to ws connect
         # self.ws.settimeout(300)  # Set timeout to 300 seconds, usually takes 3 minutes for video, this should be enough
@@ -147,7 +156,7 @@ class ComfyCall:
 
             # 6. Download Result
             history = self.get_history(prompt_id)[prompt_id]
-            saved_files = []
+            saved_files = {}
 
             output_dir = os.path.join(self.OUTPUT_DIR, folder)
             if not os.path.exists(output_dir):
@@ -182,37 +191,44 @@ class ComfyCall:
                     
                     ext = os.path.splitext(item['filename'])[1]
                     if ext.lower() in ['.mp4', '.mov', '.avi', '.gif', '.webm']:
-                        new_filename = f"{base_file_name}_video{ext}"#f"{ts}_video{ext}"
+                        new_filename = f"{base_file_name}_{file_name_modifier}_video{ext}"
+                        file_key = "video"
                     else:
-                        new_filename = f"{base_file_name}_end{ext}"#f"{ts}_end{ext}"
+                        new_filename = f"{base_file_name}_{file_name_modifier}_end{ext}"
+                        file_key = "image_final"
                     
                     output_path = os.path.join(output_dir, new_filename)
                     with open(output_path, "wb") as f:
                         f.write(file_data)
 
                     print(f"Saved to {output_path}")
-                    saved_files.append(output_path)
+                    saved_files[file_key] = output_path
 
                 # Also save the animation prompt, source image prompt, and source image review to a text file for reference
-                prompt_path = os.path.join(output_dir, f"{ts}_animation_prompt.txt")
+                #### THIS FILE NAME LOGIC NEED TO CHANGE WE MAY NOTE REVIEW EACH, SO WE ARE JUST COPYING REVIEW####
+                prompt_path = os.path.join(output_dir, f"{base_file_name}_{file_name_modifier}_animation_prompt.txt")
                 with open(prompt_path, "w") as f:
                     f.write(prompt_text)
-                source_img_path = os.path.join(output_dir, f"{ts}_source_image_prompt.txt")
+                source_img_path = os.path.join(output_dir, f"{base_file_name}_{file_name_modifier}_source_image_prompt.txt")
                 with open(source_img_path, "w") as f:
                     f.write(source_image_prompt)
-                source_review_path = os.path.join(output_dir, f"{ts}_source_image_review.txt")
+
+                source_review_path = os.path.join(output_dir, f"{base_file_name}_{file_name_modifier}_source_image_review.txt")
                 with open(source_review_path, "w") as f:
                     f.write(source_image_review)
 
-                saved_files.append(prompt_path)
-                saved_files.append(source_img_path)
-                saved_files.append(source_review_path)
+                saved_files["animation_prompt"] = prompt_path
+                saved_files["source_image_prompt"] = source_img_path
+                saved_files["source_image_review"] = source_review_path
+                saved_files["image_start"] = input_image_path
+
+                
             
             return saved_files
 
         except Exception as e:
             print(f"An error occurred using ComfyCall: {e}")
-            return []
+            return {}
 
 if __name__ == "__main__":
     # Example usage
