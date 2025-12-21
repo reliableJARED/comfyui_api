@@ -106,7 +106,7 @@ def workflow(seed="student teen", img_count=5, lighting="rays of sunlight", scen
     max_prompt_attempts = 5
     video_clip_extensions = 3
     img_prompt_prefix = "photograph, photo of " #"Artistic Animation"
-    img_prompt_suffix = "UHD,8k" #"3D Render,high quality"
+    img_prompt_suffix = " 8k" #"3D Render,high quality"
     
     while not image_prompt_list or prompt_attempts > max_prompt_attempts:
         print("Generating prompts...")
@@ -162,34 +162,48 @@ def workflow(seed="student teen", img_count=5, lighting="rays of sunlight", scen
     # Step 4: Generate images for each shot
     images_paths = []
 
+    # Step 4a: Generate ALL images first
+    generated_images = []
     for shot in image_prompt_list:
-        #image_prompt = f"photograph, photo of {shot}, {lighting},UHD,8k"
         image_prompt = f"{img_prompt_prefix}, {shot}, {img_prompt_suffix}"
-        impath = image_generate(image_prompt,directory=shoot_folder)
-        #save VRAM by unloading the image generation model
-        _ = _unload_image_generate()
+        print(f"\nGenerating image for shot: {shot}")
+        impath = image_generate(image_prompt, directory=shoot_folder)
+        generated_images.append({'img_path': impath, 'image_prompt': image_prompt})
+        print(f"Generated: {impath}")
+    
+    # Unload image generation model after all images are done
+    _ = _unload_image_generate()
+    print(f"\nAll {len(generated_images)} images generated. Starting reviews...")
 
-        #REVIEW IMAGE PROMPT
-        review_result = image_review(impath,image_prompt)
-        print("\n","!"*50)
+    # Step 4b: Review ALL images
+    for img_info in generated_images:
+        impath = img_info['img_path']
+        image_prompt = img_info['image_prompt']
+        
+        review_result = image_review(impath, image_prompt)
+        print("\n", "!"*50)
         print(f"Image Source:\n {impath}\n")
         print(f"\nImage Review Result:\n {review_result}\n")
-        print("\n","*"*50)
+        print("\n", "*"*50)
+        
+        # Unload model between reviews to avoid VRAM issues
+        _ = _unload_model()
+        
+        images_paths.append({'img_path': impath, 'review_result': review_result, 'image_prompt': image_prompt})
+        print(f"\nReview complete for: {impath}\n")
 
-        """if "Not-Quality" in review_result:
-            _ =_unload_model()
-            print(f"Image for shot '{shot}' did not pass review. Regenerating...")
-            #regenerate image
-            impath = image_generate(image_prompt,directory=shoot_folder)
-            review_result = image_review(impath,image_prompt)
-            print(f"Regenerated Image Review Result: {review_result}")"""
-        
-        #unfortunatly will need to unload the model between calls to avoid VRAM issues
-        _ =_unload_model()
-        #_ = _unload_image_generate()
-        
-        images_paths.append({'img_path':impath, 'review_result': review_result, 'image_prompt': image_prompt})
-        print(f"\nGenerated Image and Review done image: '{shot}': {impath}\n")
+    """
+    # Step 4c: Regenerate failed images (commented out for now)
+    for i, img_info in enumerate(images_paths):
+        if "Not-Quality" in img_info['review_result']:
+            print(f"Image '{img_info['img_path']}' did not pass review. Regenerating...")
+            impath = image_generate(img_info['image_prompt'], directory=shoot_folder)
+            _ = _unload_image_generate()
+            review_result = image_review(impath, img_info['image_prompt'])
+            _ = _unload_model()
+            images_paths[i] = {'img_path': impath, 'review_result': review_result, 'image_prompt': img_info['image_prompt']}
+            print(f"Regenerated Image Review Result: {review_result}")
+    """
 
     #unload the image model and free VRAM
     _ = _unload_image_generate()
@@ -297,7 +311,10 @@ def extract_prompt(xml_prompt, expected_tags=None, min_shots=10):
             
             for key in ['base', 'skin', 'hair', 'face', 'eyes', 'lips', 'breasts']:
                 if tag_values.get(key):
-                    parts.append(tag_values[key]+" "+key)
+                    if key == 'base':
+                        parts.append(tag_values[key])
+                    else:
+                        parts.append(tag_values[key]+" "+key)
             
             #if clothing: parts.append(clothing) #CLOTHING INJECTED IN SCENE DIRECTLY NOW
             
