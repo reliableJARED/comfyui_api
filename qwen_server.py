@@ -138,6 +138,7 @@ def unload_t2i_model():
         image_model._unload_model()
         image_model = None
         print("Image Generation model unloaded.")
+        time.sleep(10)# wait a bit to ensure VRAM is freed
         return jsonify({"status": "Image Generation model unloaded."}),200
     else:
         return jsonify({"status": "No Image Generation model loaded, nothing to unload"}),200
@@ -149,6 +150,7 @@ def unload_chat_model():
         print("Unloading Chat model...")
         chat_model['model']._unload_model()
         chat_model = None
+        time.sleep(10)# wait a bit to ensure VRAM is freed
         print("Chat model unloaded.")
         return jsonify({"status": "Chat model unloaded."}),200
     else:

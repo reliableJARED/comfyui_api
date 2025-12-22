@@ -13,9 +13,10 @@ import os
 
 # ================= CONFIGURATION =================
 COMFY_SERVER = "127.0.0.1:8000" # Local ComfyUI address
-WORKFLOW_FILE = "video_wan2_2_14B_i2v_nsfw(v2)_API.json" # The file you saved via "Export (API)"
+WORKFLOW_FILE = "video_wan2_2_14B_i2v_nsfw(v2)_API_3.json" # The file you saved via "Export (API)"
                                                                                                                     #sex from behind, doggystyle                                                                                #nude sitting on rose petals                                         
-INPUT_IMAGE = "C:\\Users\\jared\\Documents\\code\\local_jarvis\\xserver\\autogen\\neon\\1766200115_image.png"#"C:\\Users\\jared\\Documents\\code\\local_jarvis\\xserver\\autogen\\shoots\\1766195969_image.png"#"C:\\Users\\jared\\Documents\\ComfyUI\\input\\astronaut.jpg" # The local image you want to send
+#INPUT_IMAGE = "C:\\Users\\jared\\Documents\\code\\local_jarvis\\xserver\\autogen\\anime_test\\1766372002_end.png"#"C:\\Users\\jared\\Documents\\code\\local_jarvis\\xserver\\autogen\\shoots\\1766195969_image.png"#"C:\\Users\\jared\\Documents\\ComfyUI\\input\\astronaut.jpg" # The local image you want to send
+INPUT_IMAGE = "C:\\Users\\jared\Documents\\code\\local_jarvis\\xserver\demetra\\tartarus\\demetra_in_tartarus-p2_a7_f6_c3.png"
 CLIENT_ID = str(uuid.uuid4())
 
 # IDS FROM YOUR JSON (Open video_wan2_2_14B_i2v_nsfw(v2)_API.json to check these!)
@@ -26,6 +27,10 @@ IMAGE_NODE_ID = "97"
 PROMPT_NODE_ID = "93"
 # Look for class_type: "KSampler" (to randomize seed)
 SEED_NODE_ID = "85"
+#HIGH MODEL LORA: nsfwsks, and strength
+#high model lora "lopi999/Wan2.2-I2V_General-NSFW-LoRA"
+HIGH_MODEL_LORA_ID = "143"
+LOW_MODEL_LORA_ID = "139"
 # =================================================
 
 def upload_image(file_path):
@@ -76,6 +81,7 @@ if __name__ == "__main__":
     ws = websocket.WebSocket()
     ws.connect(f"ws://{COMFY_SERVER}/ws?clientId={CLIENT_ID}")
 
+    
     # 2. Upload Your Image
     print(f"Uploading {INPUT_IMAGE}...")
     upload_resp = upload_image(INPUT_IMAGE)
@@ -88,10 +94,30 @@ if __name__ == "__main__":
     # Update Image Node
     workflow[IMAGE_NODE_ID]["inputs"]["image"] = server_filename
 
-    # Update Prompt Node
+    #Set LORA strengths
+    workflow[HIGH_MODEL_LORA_ID]["inputs"]["strength_model"] = 1.0
+    workflow[LOW_MODEL_LORA_ID]["inputs"]["strength_model"] = 0.7
 
-    #workflow[PROMPT_NODE_ID]["inputs"]["text"] = "They are having sex, fucking, thrusts in and out. [penis moves in and out of her vagina], dripping white cum and ejaculation. her ass bouncing, breast jiggle, she maintains eye contact with camera. The hips of the man and woman move in rythem opposite directions. Camera [dolly in] slow"
-    workflow[PROMPT_NODE_ID]["inputs"]["text"] ="They are having sex, grinding and thrusting rhythmically. [hips rock back and forth in sync], sweat glistening as skin slides against skin. Her ass pops and bounces with each thrust, breasts jiggle with motion. She maintains intense eye contact with camera, lips slightly parted. [Camera circles around them slowly] low angle, tracking their movement as they climax together."
+    # Update Prompt Node
+    """
+    Guidance for writing better motion prompts for Wan2.2-I2V_General-NSFW-LoRA:
+    huggingface: lopi999/Wan2.2-I2V_General-NSFW-LoRA
+    
+    LORA Key Phrase: nsfwsks
+
+    5. Tips for Better Motion
+    Describe the motion explicitly in natural language (not tags)
+    Use temporal language: "first... then... repeating...", "slow/fast", "rhythmic", "continuously"
+    Camera descriptions help: "close-up shot", "camera follows", "POV angle"
+    Describe physical details: body parts moving, expressions changing
+    Use prompt extension (if available in your workflow) — Wan models benefit from expanded descriptive prompts
+    """
+
+    #workflow[PROMPT_NODE_ID]["inputs"]["text"] = "nsfwsks,They are having sex, fucking, thrusts in and out. [penis moves in and out of her vagina], dripping white cum and ejaculation. her ass bouncing, breast jiggle, she maintains eye contact with camera. The hips of the man and woman move in rythem opposite directions. Camera [dolly in] slow"
+    #workflow[PROMPT_NODE_ID]["inputs"]["text"] ="nsfwsks, she lifts arms unties string behind neck, top slides off revealing nude breast [uncensored nipples] high detail skin, hips swey, gentle breeze, [Camera slow dolly in] low angle."
+    #workflow[PROMPT_NODE_ID]["inputs"]["text"] ="nsfwsks, she bends forward and pulls down her skirt belt and leggings all the way to her feet, she is now full nude, bends back up, reveals uncensored [vagina]. breasts bouncing, hips moving. Focus on full body"
+    workflow[PROMPT_NODE_ID]["inputs"]["text"] ="nsfwsks, POV perspective, a woman performs oral sex with rhythmic head movements. She slowly moves her head down, taking him deep into her mouth, then lifts up smoothly before repeating the motion in a steady pace. Her expression shows pleasure and focus. Close-up camera angle capturing the intimate details of the repetitive bobbing motion."
+    
     # Randomize Seed (so you don't get the exact same video every time)
     if SEED_NODE_ID in workflow:
         workflow[SEED_NODE_ID]["inputs"]["seed"] = random.randint(1, 1000000000)
@@ -99,6 +125,7 @@ if __name__ == "__main__":
     response = queue_prompt(workflow)
     prompt_id = response['prompt_id']
     print(f"Job queued! Prompt ID: {prompt_id}")
+
 
     # 5. Wait for completion
     track_progress(ws, prompt_id)
@@ -116,7 +143,12 @@ if __name__ == "__main__":
 
         if output_data:
             ts = int(time.time())
-            output_dir = "C:\\Users\\jared\\Documents\\code\\local_jarvis\\xserver\\autogen\\movies"
+            #output_dir = "C:\\Users\\jared\\Documents\\code\\local_jarvis\\xserver\\autogen\\anime_test"
+            output_dir = "C:\\Users\\jared\\Documents\\code\\local_jarvis\\xserver\\demetra\\tartarus"
+            #save prompt
+            prompt_file = os.path.join(output_dir, f"{ts}_prompt.txt")
+            with open(prompt_file, "w") as f:
+                f.write(workflow[PROMPT_NODE_ID]["inputs"]["text"])
             if not os.path.exists(output_dir):
                 os.makedirs(output_dir)
 

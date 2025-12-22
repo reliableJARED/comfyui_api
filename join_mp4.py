@@ -75,9 +75,14 @@ def combine_videos(video_list, output_file_name):
 if __name__ == "__main__":
     # List the paths to your input video files in the desired order
     input_files = [
-        r"C:\Users\jared\Documents\code\local_jarvis\xserver\autogen\sandi_815\1766267253_image_video.mp4",
-        r"C:\Users\jared\Documents\code\local_jarvis\xserver\autogen\sandi_815\1766267428_image_video.mp4",
-        r"C:\Users\jared\Documents\code\local_jarvis\xserver\autogen\sandi_815\1766267579_image_video.mp4"
+        r"C:\Users\jared\Documents\code\local_jarvis\xserver\autogen\anime_test\1766360525_video.mp4",
+        r"C:\Users\jared\Documents\code\local_jarvis\xserver\autogen\anime_test\1766360924_video.mp4",
+        r"C:\Users\jared\Documents\code\local_jarvis\xserver\autogen\anime_test\1766361407_video.mp4",
+        r"C:\Users\jared\Documents\code\local_jarvis\xserver\autogen\anime_test\1766361789_video.mp4",
+        r"C:\Users\jared\Documents\code\local_jarvis\xserver\autogen\anime_test\1766362448_video.mp4",
+        r"C:\Users\jared\Documents\code\local_jarvis\xserver\autogen\anime_test\1766369322_video.mp4",
+        r"C:\Users\jared\Documents\code\local_jarvis\xserver\autogen\anime_test\1766371131_video.mp4",
+        r"C:\Users\jared\Documents\code\local_jarvis\xserver\autogen\anime_test\1766372002_video.mp4"
     ]
     output_name = f"combined_clips({len(input_files)}).mp4"
     

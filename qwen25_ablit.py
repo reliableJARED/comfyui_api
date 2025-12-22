@@ -75,6 +75,7 @@ class Qwen25Chat:
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
         logging.debug("Model unloaded and CUDA cache cleared")
+        return True
     
     def generate(self, prompt, max_new_tokens=2048, streaming=False):
         """

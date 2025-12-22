@@ -75,9 +75,11 @@ class Qwen3VLChat:
             self.processor = None
         
         gc.collect()
+
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
         logging.debug("Model unloaded and CUDA cache cleared")
+        return True
     
     def generate(self, prompt, images=None, max_new_tokens=2048, streaming=False):
         """
@@ -277,9 +279,9 @@ if __name__ == "__main__":
     chat_model = Qwen3VLChat()
     
     # Optional: Run demo inference
-    demo_image_path = r"C:\Users\jared\Pictures\Screenshots\bulldozer.png"
+    demo_image_path = r"C:\Users\jared\Documents\code\local_jarvis\xserver\autogen\anime_test\1766358994_image.png"
     if os.path.exists(demo_image_path):
-        chat_model.demo_inference(demo_image_path, "What type of vehicle is this?")
+        chat_model.demo_inference(demo_image_path, "create a detailed description of the character, 25 words, using tags suitable for image generation on Stable Diffusion. Focus on appearance, clothing, features, and style. Be concise and specific. since the image prompt space is limited.")
     
     # Start interactive chat loop
     chat_model.chat_loop()

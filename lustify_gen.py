@@ -8,6 +8,7 @@ Updated to use LUSTIFY-SDXL-NSFW-checkpoint-v2-0-INPAINTING model
 import sys
 import subprocess
 from pathlib import Path
+import time
 import torch
 from PIL import Image
 import uuid
@@ -32,7 +33,7 @@ class ImageGenerator:
     def __init__(self, 
                  model_name="TheImposterImposters/LUSTIFY-v4.0",#"UnfilteredAI/NSFW-GEN-ANIME","TheImposterImposters/LUSTIFY-v2.0",,#"AI-Porn/pornworks-anime-desire-NSFW-Anime-and-hentai-sdxl-checkpoint",
                  use_mps=True,
-                 use_cuda=None,
+                 use_cuda=True,
                  animated=False):
         """
         Initialize the ImageGenerator with model loading and dependency checking.
@@ -164,10 +165,11 @@ class ImageGenerator:
             }
             
             # Set torch_dtype based on device
-            if self.is_cuda:
-                kwargs["dtype"] = torch.float32  # CUDA works well with float16
+            #Keyword arguments {'dtype': torch.float16} are not expected by StableDiffusionXLPipeline and will be ignored.
+            """if self.is_cuda:
+                kwargs["dtype"] = torch.float16  # CUDA works well with float16
             else:
-                kwargs["dtype"] = torch.float32  # MPS and CPU work better with float32
+                kwargs["dtype"] = torch.float32  # MPS and CPU work better with float32"""
             
             # Load the appropriate pipeline
             print("Downloading/loading model (this may take a few minutes on first run)...")
@@ -199,13 +201,9 @@ class ImageGenerator:
                 if hasattr(pipe, 'enable_attention_slicing'):
                     pipe.enable_attention_slicing()
                 
-                # Enable model CPU offload for memory efficiency
-                try:
-                    if hasattr(pipe, 'enable_model_cpu_offload'):
-                        pipe.enable_model_cpu_offload()
-                        print("✓ Model CPU offload enabled for CUDA")
-                except Exception as e:
-                    print(f"⚠️ Model CPU offload not available: {e}")
+                # Enable TensorFloat32 for better performance on Ampere+ GPUs
+                torch.set_float32_matmul_precision('high')
+                print("✓ TensorFloat32 precision enabled for faster matmul")
                 
                 # Enable memory efficient attention if available
                 try:
@@ -263,6 +261,17 @@ class ImageGenerator:
         else:
             raise ValueError(f"Unknown pipeline type: {pipeline_type}")
     
+    def _count_tokens(self, text):
+        """Count CLIP tokens in a prompt (approximate)"""
+        try:
+            from transformers import CLIPTokenizer
+            tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14")
+            tokens = tokenizer(text, truncation=False, return_tensors=None)
+            return len(tokens['input_ids'])
+        except Exception:
+            # Fallback: rough estimate (~1.3 tokens per word)
+            return int(len(text.split()) * 1.3)
+    
     def text_to_image(self, 
                  prompt, 
                  output_file="output.png",
@@ -270,8 +279,8 @@ class ImageGenerator:
                  sub_folder = "autogen",
                  shoot_folder = "shoots",
                  output_dir=None,
-                 num_inference_steps=30,  # Model docs recommend 30 steps
-                 guidance_scale=5.5,     # Within the 4-7 range from docs
+                 num_inference_steps=40,  # SDXL benefits from 40+ steps for finer details
+                 guidance_scale=7.5,      # 7-9 range gives better prompt adherence and sharper details
                  width=1024,
                  height=1024,
                  use_enhanced_prompting=True,  # adds LUSTIFY-specific tags
@@ -304,6 +313,10 @@ class ImageGenerator:
                 print(f"🎨 Enhanced prompt: '{enhanced_prompt}'")
                 prompt = enhanced_prompt
         
+        # Count and display token usage
+        token_count = self._count_tokens(prompt)
+        print(f"CLIP input tokens: {token_count}/77 (max for SDXL)")
+        
         # Get pipeline
         pipe = self._get_pipeline("text-to-image")
         
@@ -326,7 +339,7 @@ class ImageGenerator:
         # Add LUSTIFY-specific negative prompt for better quality
         negative_prompt = kwargs.pop('negative_prompt', None)
         if not negative_prompt:
-            negative_prompt = "blurry, low quality, distorted, deformed, extra limbs, bad anatomy, hands"
+            negative_prompt = "blurry, low quality, distorted, deformed, extra limbs, bad anatomy, hands, ugly, disfigured, poorly drawn, amateur, overexposed, underexposed, out of focus, watermark, signature, text"
         
         # Generation parameters
         generation_kwargs = {
@@ -433,15 +446,24 @@ class ImageGenerator:
                 print("✓ CUDA cache cleared")
             
             print("✅ All models unloaded successfully")
+            return True
         except Exception as e:
             print(f"❌ Error unloading models: {e}")
     
  
 if __name__ == "__main__":
     # Example usage
-    generator = ImageGenerator(use_mps=True, animated=False)
-    prompt = "deepthroat blow job, 1girl 1man, the girl, fair skin, straight long blond hair, angular face, dark mascara, natural plump breasts, nude, edge of hotel by pool. she is in the water, his penis is in her mouth, he is sitting on the pool edge. View from the side, 3d high res render animation"
-    output_path = generator.text_to_image(prompt, output_file="lustify_anime_gen_test.png")
+    ts = time.time()
+    generator = ImageGenerator(use_mps=False, animated=True)
+    #prompt = "deepthroat blow job, 1girl 1man, the girl, fair skin, straight long blond hair, angular face, dark mascara, natural plump breasts, nude, edge of hotel by pool. she is in the water, his penis is in her mouth, he is sitting on the pool edge. View from the side, 3d high res render animation"
+    prompt = "nsfw, low_squat hips almost touching the ground,long straight black hair, iris is light purple, angular features, thin black choker necklace, wearing black lace braw, black knee high nylons, pleated black vinyl minis kirt, black high heels. 2.5D realistic animation, front view"
+    prompt = "nsfw, cosmic background, wide_stance feet planted far apart, chest forward, hips back, long straight black hair, iris is light purple, angular features, thin black choker, black lace braw, black knee high nylons, pleated purple vinyl minis kirt, black high heels. hentai realistic animation, front view"
+
+    output_path = generator.text_to_image(prompt, output_file=f"{ts}_anime_gen_test.png")
+    #save prompt
+    prompt_file = output_path.replace(".png", f"{ts}_prompt.txt")
+    with open(prompt_file, 'w') as f:
+        f.write(prompt)
     print(f"Generated image saved at: {output_path}")
     generator._unload_model()
     
