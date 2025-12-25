@@ -115,7 +115,7 @@ def get_subfolders():
 
 
 def get_items_in_folder(folder_path):
-    """Get all images/videos and subfolders in a specific folder."""
+    """Get all images/videos, subfolders, and text files in a specific folder."""
     try:
         bucket = get_bucket()
         prefix = folder_path.rstrip('/') + '/' if folder_path else ''
@@ -123,6 +123,8 @@ def get_items_in_folder(folder_path):
         iterator = bucket.list_blobs(prefix=prefix, delimiter='/')
         
         images = []
+        text_files = set()
+        
         for blob in iterator:
             # Get just the filename
             name = blob.name[len(prefix):]
@@ -130,6 +132,8 @@ def get_items_in_folder(folder_path):
                 ext = os.path.splitext(name)[1].lower()
                 if ext in ALLOWED_EXTENSIONS:
                     images.append(name)
+                elif ext == '.txt':
+                    text_files.add(name)
         
         # Get subfolders
         subfolders = []
@@ -138,10 +142,10 @@ def get_items_in_folder(folder_path):
             if not subfolder_name.startswith('.') and subfolder_name != 'thumbnails':
                 subfolders.append(subfolder_name)
         
-        return sorted(images), sorted(subfolders)
+        return sorted(images), sorted(subfolders), text_files
     except Exception as e:
         print(f"Error listing folder {folder_path}: {e}")
-        return [], []
+        return [], [], set()
 
 
 def get_blob(path):
@@ -344,8 +348,8 @@ def view_folder(folder_name, subfolder_name=None):
         display_name = folder_name
         parent_folder = None
     
-    # Get images and subfolders
-    images, subfolders = get_items_in_folder(folder_path)
+    # Get images, subfolders, and text files
+    images, subfolders, text_files = get_items_in_folder(folder_path)
     
     if not images and not subfolders:
         # Check if folder exists at all
@@ -354,12 +358,20 @@ def view_folder(folder_name, subfolder_name=None):
         if not list(iterator):
             abort(404)
     
-    # Get favorites status for all images
+    # Get favorites status and prompts for all images
     favorites = load_favorites_from_cookie()
     image_favorites = {}
+    image_prompts = {}
+    
     for image in images:
         image_path = f"{folder_path}/{image}"
         image_favorites[image_path] = image_path in favorites
+        
+        # Check for associated text file
+        base_name = os.path.splitext(image)[0]
+        txt_name = base_name + '.txt'
+        if txt_name in text_files:
+            image_prompts[image] = txt_name
     
     return render_template('folder.html',
                           folder_name=display_name,
@@ -368,7 +380,8 @@ def view_folder(folder_name, subfolder_name=None):
                           image_count=len(images),
                           subfolders=subfolders if not subfolder_name else [],
                           parent_folder=parent_folder,
-                          favorites=image_favorites)
+                          favorites=image_favorites,
+                          prompts=image_prompts)
 
 
 @app.route('/thumbnail/<path:file_path>')
