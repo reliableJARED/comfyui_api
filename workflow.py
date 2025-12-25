@@ -231,11 +231,11 @@ def rear_doggystyle_workflow():
 def front_doggystyle_workflow():
     return
 
-def workflow_v2(shoot_folder="dec24_workflow_test5"):
+def workflow_v2(shoot_folder="dec24_workflow_test6"):
     # Create shoot folder on GCS if it doesn't exist
     bucket_name = "xserver"
     gstorage.check_or_create_folder(bucket_name, shoot_folder)
-
+    characters = 3
     photos = 10 #how many from EACH model, will generate 2x this in images
     video_clip_extensions = 3 #how many successive frame to frame clips to try and make
 
@@ -323,8 +323,6 @@ def workflow_v2(shoot_folder="dec24_workflow_test5"):
     #This creates different people, ai does not create the same person
     prompt = f"""
     You create pornographic NSFW content.  First Come up with a look for our model. She will be described THE SAME WAY each time, except for clothing since she could be nude.
-
-    CHRISTMAS THEME!  Winter clothing or nude in a snowy environment, cabin, lodge.  Create a detailed APPEARANCE
     
     DESCRIPTION STRUCTURE for the WOMAN ONLY:\n
     ###Facial Structure
@@ -430,39 +428,29 @@ def workflow_v2(shoot_folder="dec24_workflow_test5"):
 
     Return XML schema for the image prompts, put each string prompt inside <scene></scene> tags. ONLY use scene tag to contain prompt strings, no other tags.
 
-    YOU MUST describe the woman exactly the same (except clothing or nude) only the position, act and perspective should change.  Keep prompting short there is a hard limit of 30 words.
+    YOU MUST describe the woman exactly the same (except clothing or nude) only the position, act and perspective should change.  
+    Keep prompting short there is a hard limit of about 35 words (77 tokens).
     """
     
     
-
-    tries = 0
-    q3_results = []
-    while tries < 3:
-        tries += 1
-        q3_results = qwen_generate(prompt, model_type='vlm')
-        q3_results = extract_scenes(q3_results)
-        if q3_results:
-            break
-        print(f"Attempt {tries} failed, retrying...")
+    #Qwen 2.5 is Not nearly as good at image prompt generation as Qwen 3 VLM. Switch to Qwen 3 VLM for image prompt generation
+    
+    scenes = []
+    for attempt in range(3):
+        tries = 0
+        while tries < 3:
+            tries += 1
+            q3_results = qwen_generate(prompt, model_type='vlm')
+            q3_results = extract_scenes(q3_results)
+            if q3_results:
+                scenes += q3_results
+                break
+            print(f"Attempt {tries} failed, retrying...")
     print(f"Q3 Generated: {len(q3_results)} scenes, was asked for {photos}")
-    _unload_model()
-    time.sleep(10)
-    tries = 0
-    q25_results = []
-    while tries < 3:
-        tries += 1
-        q25_results = qwen_generate(prompt, model_type='lm')
-        q25_results = extract_scenes(q25_results)
-        if q25_results:
-            break
-        print(f"Attempt {tries} failed, retrying...")
-    print(f"Q2.5 Generated: {len(q25_results)} scenes, was asked for {photos}")
+
     _unload_model()
     time.sleep(10)
     
-    #Join the two - extract scenes from both and combine into a single list
-    scenes =  q3_results + q25_results
-
     # Generate ALL images first
     generated_images = []
     for shot in scenes:
@@ -518,7 +506,9 @@ def workflow_v2(shoot_folder="dec24_workflow_test5"):
         img_info['review_result'] = review_result
 
         # INITIAL ANIMATION PROMPT - OPTIMIZED FOR WAN 2.2 I2V MODEL
-        animation_prompt = """Analyze this image and create a prompt to animate it as a 5 second video clip using the Wan 2.2 I2V model.  Understan what the image is depicting and create a NATURAL LANGUAGE description of the erotic sexual motion and camera angle to animate.
+        animation_prompt = f"""Analyze this image and created with this prompt: {image_prompt} 
+        
+        Create a prompt to animate the image as a 5 second video clip using the Wan 2.2 I2V model.  Understand what the image is depicting and create a NATURAL LANGUAGE description of how to animate the erotic sexual motion and camera angle to animate.
 
 CRITICAL RULES FOR WAN 2.2:
 1. Use NATURAL LANGUAGE descriptions only - NO brackets [word] or parentheses (word) - they have no effect in Wan
