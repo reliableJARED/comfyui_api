@@ -10,6 +10,10 @@ import time
 
 app = Flask(__name__)
 
+
+#when running in terminal use this to set the GPU
+#$env:CUDA_VISIBLE_DEVICES="0"
+
 # Global instance of ImageGenerator
 generator = None
 
@@ -125,9 +129,17 @@ def unload_model():
 
 
 if __name__ == "__main__":
+    
+    #when running in terminal use this to set the GPU
+    #$env:CUDA_VISIBLE_DEVICES="0"
+
+    #set to GPU 1 by default
+    import os
+    os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+    print("CUDA_VISIBLE_DEVICES set to 1")
     # Pre-load the generator on startup
     print("Starting LUSTIFY Image Generation Server...")
-    get_generator(animated=True)
+    get_generator(animated=False)
     
     # Run the Flask server
     app.run(host='0.0.0.0', port=8052, debug=False)

@@ -24,10 +24,11 @@ import random
 from comfy_call import ComfyCall
 import json
 from join_mp4 import combine_videos
+from deployed import gstorage
 
 COMFY = ComfyCall()
 
-def i2v(image_path="", prompt="",folder="neon", source_image_review="", source_image_prompt="",file_name_modifier="1"):
+def i2v(image_path="", prompt="",folder="neon", source_image_review="", source_image_prompt="",file_name_modifier="1",lora="sex",clear_vram=False):
     global COMFY
     """
     Generate a video from an image and prompt using ComfyCall.
@@ -44,24 +45,45 @@ def i2v(image_path="", prompt="",folder="neon", source_image_review="", source_i
         source_image_review=source_image_review,
         source_image_prompt=source_image_prompt,
         base_file_name=base_filename_noext,
-        file_name_modifier=file_name_modifier
+        file_name_modifier=file_name_modifier,
+        lora=lora,
+        clear_vram=clear_vram
     )
     return result
+
+def extract_lora_tag(prompt):
+    """
+    Extracts the content within <lora>...</lora> tags from the prompt.
+    Returns the extracted lora name and the prompt with the tag removed.
+    """
+    match = re.search(r'<lora>(.*?)</lora>', prompt, re.IGNORECASE)
+    if match:
+        lora_value = match.group(1).strip()
+        clean_prompt = prompt.replace(match.group(0), "").strip()
+        return lora_value, clean_prompt
+    return None, prompt
     
-def videogen(clips=1,image_path="", prompt="",folder="neon",source_image_review="", source_image_prompt=""):
+def videogen(clips=1,image_path="", prompt="",folder="neon",source_image_review="", source_image_prompt="", lora="sex"):
     #this function will generate successive videos from a single image and prompt attempting to create a longer animation
     animation_prompt = prompt
     start_image = image_path
     counter = 0
     all_files = []
     video_clips = []
-    #CRITICAL to activate the LORA being used, add nsfwsks to prompt
-    lora_keyPhrase = "nsfwsks,"
+    lora = lora #default LORA model to use for video generation based on content
+    clear_vram = True #default when starting video gen to clear vram between clips
     while counter < clips:
         counter += 1
         print(f"Generating clip {counter} of {clips}...")
+        #Check the initial prompt to determine if LORA should be overridden
+        extracted_lora, prompt = extract_lora_tag(prompt)
+        if extracted_lora != lora and extracted_lora is not None:
+            lora = extracted_lora
+            print(f"Overriding LORA to '{lora}' based on prompt tag. Also sending request to clear vram because model change.")
+            clear_vram = True
+            
         #first generate initial video
-        result = i2v(image_path=start_image, prompt=lora_keyPhrase+prompt, folder=folder,source_image_review=source_image_review, source_image_prompt=source_image_prompt,file_name_modifier=f"{counter}")
+        result = i2v(image_path=start_image, prompt=prompt, folder=folder,source_image_review=source_image_review, source_image_prompt=source_image_prompt,file_name_modifier=f"{counter}", lora=lora, clear_vram=clear_vram)
         """result = {'video': 'path_to_video',
                     'image_final': 'path_to_final_image',
                     'animation_prompt': 'path_to_animation_prompt.txt',
@@ -69,8 +91,28 @@ def videogen(clips=1,image_path="", prompt="",folder="neon",source_image_review=
                     'source_image_review': 'path_to_source_image_review.txt',
                     'image_start': 'path_to_input_image'}
         """
+        # Check if result is empty or missing required keys
+        if not result:
+            print(f"ERROR: i2v returned empty result for clip {counter}")
+            raise ValueError(f"Video generation failed for clip {counter} - empty result returned")
+        if 'video' not in result:
+            print(f"ERROR: i2v result missing 'video' key for clip {counter}. Keys present: {list(result.keys())}")
+            raise ValueError(f"Video generation failed for clip {counter} - no video in result")
+        
         all_files.append(result)
         video_clips.append(result['video'])
+
+        # Upload video and animation prompt to GCS
+        bucket_name = "xserver"
+        if 'video' in result and os.path.exists(result['video']):
+            video_path = result['video']
+            video_filename = os.path.basename(video_path)
+            gstorage.upload_blob(bucket_name, video_path, f"{folder}/{video_filename}")
+            
+        if 'animation_prompt' in result and os.path.exists(result['animation_prompt']):
+            anim_prompt_path = result['animation_prompt']
+            anim_prompt_filename = os.path.basename(anim_prompt_path)
+            gstorage.upload_blob(bucket_name, anim_prompt_path, f"{folder}/{anim_prompt_filename}")
 
         #check if we have at least one more clip to generate, else break we are done
         if counter >= clips:
@@ -83,9 +125,12 @@ def videogen(clips=1,image_path="", prompt="",folder="neon",source_image_review=
         #get the final image path
         end_image = result['image_final']
         #create a new prompt for VLM model - OPTIMIZED FOR WAN 2.2 I2V MODEL
+        last_frame_prompt_modifier = "You need to animate the FINAL clip of the video.  It should end in an orgaism, or she should move in to a position (if she isn't in one already) to receive a facial cumshot.  The image should clearly show the action and camera angle to be animated in the next clip."
         prompt = f"""The image you are looking at is the LAST FRAME of a video generated with this prompt: {animation_prompt}
 
 Your task: Create a NEW continuation prompt for the Wan 2.2 I2V video model. This model requires NATURAL LANGUAGE descriptions, NOT tag-based prompts.
+
+{last_frame_prompt_modifier if counter == clips else ""}
 
 CRITICAL RULES FOR WAN 2.2:
 1. Use descriptive sentences, NOT tags or brackets like [word] or (word) - those do nothing in Wan
@@ -94,6 +139,7 @@ CRITICAL RULES FOR WAN 2.2:
 4. Camera terms that work: "close-up shot", "POV perspective", "camera slowly dollies in", "low angle view", "the camera follows"
 5. Keep prompts 2-4 sentences, focusing on MOTION and CAMERA only
 6. The model takes visual details from the input image - describe only ACTION and CAMERA
+7. If you are creating a 'facial or 'cum on face' scene, use those terms explicitly in the prompt. If you are creating a blowjob scene, use 'blowjob', 'fellatio', or 'oral' terms explicitly.
 
 MOTION VOCABULARY:
 - Thrusting rhythmically, hips moving back and forth, bouncing motion
@@ -108,19 +154,27 @@ CAMERA VOCABULARY:
 - Low angle looking up, overhead shot looking down
 - Side profile capturing the motion
 
-PROGRESSION: Move the scene toward climax with increasing intensity.
+PROGRESSION: Your prompts should continue the progression of the scene, and head toward climax (facial). The source image will determine if it's appropriate to attempt a facial scene.
 
 EXAMPLE PROMPTS:
-"She rhythmically moves her hips, riding him with increasing intensity. Her body bounces up and down as she grips his chest for support. The camera slowly dollies in to capture the intimate motion from a low angle."
+"She rhythmically moves her hips, riding him with increasing intensity. Her body bounces up and down as she grips his chest for support. The camera slowly dollies in to capture the intimate motion from a low angle<lora>sex</lora>."
 
-"He thrusts deeply in a steady rhythm, her body responding to each movement. She arches her back and moans as the intensity builds toward climax. POV perspective capturing her expressions of pleasure."
+"He thrusts deeply in a steady rhythm, her body responding to each movement. She arches her back and moans as the intensity builds toward climax. POV perspective capturing her expressions of pleasure<lora>sex</lora>."
 
-"Her head bobs up and down rhythmically, taking him deep into her mouth then pulling back slowly. She maintains eye contact while her hand strokes the base. Close-up shot from his POV."
+{"Her head bobs up and down rhythmically, taking him deep into her mouth then pulling back slowly. She maintains eye contact while her hand strokes the base. Close-up shot from his POV.<lora>facial</lora>" if counter == clips else "she puts the penis in her mouth and slowly moves her lips down the penis shaft to his stomach. maintains eye contact with viewer. her lips touch his torso. Then starts bobbing her head sliding penis shaft in and out of her mouth. she is giving him a deepthroat blowjob. Camera close-up POV<lora>blowjob</lora>"}
 
-Now analyze the image and create a NEW 2-4 sentence prompt describing the MOTION to animate and CAMERA angle. Natural language only, no brackets or tags."""
+{"cum shot facial. The penis ejaculates semen on her face, in her mouth and on her chest. POV.<lora>facial</lora>" if counter == clips else "sex, The mans penis thrusts all the way inside the vagina, then pulls back out of the vagina, repeatedly, full insertion. Her thighs and breasts jiggle on impacts.<lora>sex</lora>"}
+
+
+Now analyze the image and create a NEW 2-4 sentence prompt describing the MOTION to animate and CAMERA angle. The image should guide you. if it's already a blowjob stick with that style, if it's sex or any penis entering a vagina or anus stick with that. Natural language only, no brackets or tags.
+
+Finally, let the model know which LORA to use based on the content by including one of these three options: {"<lora>blowjob</lora> or <lora>sex</lora>. Sex is for all secene types not blowjob or facial." if counter != clips else "<lora>facial</lora>, or <lora>sex</lora> . Sex is for any scene not ending in a facial."}"""
         #set next image and prompt if we need it
         animation_prompt = qwen_generate(prompt, images=[end_image])
         start_image = end_image
+        prompt = animation_prompt
+
+        clear_vram = False #only clear vram on first clip or if model change
 
     # Extract base filename from first video (all share same unique number prefix)
     base_file_name = os.path.splitext(os.path.basename(video_clips[0]))[0].rsplit('_', 1)[0]
@@ -128,6 +182,13 @@ Now analyze the image and create a NEW 2-4 sentence prompt describing the MOTION
     #merge all the video clips
     full_video_filename = os.path.join(output_dir, f"{base_file_name}_full_video.mp4")
     combine_videos(video_clips, full_video_filename)
+    
+    # Upload full video to GCS
+    bucket_name = "xserver"
+    if os.path.exists(full_video_filename):
+        full_video_basename = os.path.basename(full_video_filename)
+        gstorage.upload_blob(bucket_name, full_video_filename, f"{folder}/{full_video_basename}")
+
     return all_files    
 
 def workflow_anime(seed="student teen", img_count=5, lighting="rays of sunlight", scene="library study room", shoot_folder="library"):
@@ -161,8 +222,352 @@ def workflow_anime(seed="student teen", img_count=5, lighting="rays of sunlight"
 
     return [a,b,c,d,e,f,g]
 
+def missionary_workflow():
+    return
+def fellatio_workflow():
+    return
+def rear_doggystyle_workflow():
+    return
+def front_doggystyle_workflow():
+    return
 
+def workflow_v2(shoot_folder="dec24_workflow_test5"):
+    # Create shoot folder on GCS if it doesn't exist
+    bucket_name = "xserver"
+    gstorage.check_or_create_folder(bucket_name, shoot_folder)
+
+    photos = 10 #how many from EACH model, will generate 2x this in images
+    video_clip_extensions = 3 #how many successive frame to frame clips to try and make
+
+    #PROMPT INSTRUCTIONS FOR AI IMAGE GEN PROMPTS
+    #This creates different people, ai does not create the same person
+    #FANTASY ELF, DRUID or MAGE
+    prompt = f"""
+    You create pornographic NSFW content in the FANTASY genre that depicts ELF, DRUID or MAGE woman.  Create a women and develop solo and heterosexual prompts. Use variety.  mostly nude, some clothed or bits of clothing.
+
+    1. **Underscores**: Always use underscored Danbooru tags for: sexual_position, sex_acts, perspective,  mixing with natural language for the rest of the prompt
+    2. **Front-load important concepts**:only describe the woman, man will auto generate simply using '1boy' as needed 
+    PROMPT STRUCTURE:\nFacial features, accessories like glasses, choker, hair color and style, iris color, accents like mascara, long lashes, eye shadow.\nClothing or nude, naked\nBody type fit, athletic, curvy, thin\ncharacter count, either 1girl, or 1girl 1boy,\nSexual Postion, Act and Perspective tags\nLocation in 1 or 2 words hotel room, hot tub, bed room, forest, cabin, etc.\nLighting 
+    3. **Photography tags have major visual impact**: Camera types and lighting dramatically affect the output
+    4. **Use commas to separate concepts**
+    5. **Parentheses/weight syntax doesn't work** in raw diffusers - they're treated as literal characters
+    6. **Quality matters less than content**: Focus on describing what you want rather than quality tags
+    7. **Experiment with hybrid approaches**: Mix tags and natural language for best results
+
+    ### Body Features & Modifiers
+    nude, naked, topless, bottomless
+    breasts, small_breasts, large_breasts
+    nipples, pussy, penis, erection
+    spread_legs, legs_apart
+    straddling
+    arched_back
+
+    ### Clothing States
+    lingerie, underwear, panties, bra
+    torn_clothes, clothes_pull
+    partially_undressed
+    stockings, thigh_highs, pantyhose
+    sheer_legwear
+
+    ### Intimacy & Expression
+    sex, hetero
+    kissing, french_kiss
+    looking_at_viewer, eye_contact
+    seductive_smile, open_mouth
+    sweat, saliva
+    cum_on_face, cum
+    
+    ### Character Count
+    1girl, 1boy 
+    1girl, solo 
+
+    ### Common Sexual Positions
+    missionary, missionary_position
+    sex_from_behind, doggystyle
+    cowgirl_position, girl_on_top, woman_on_top
+    reverse_cowgirl
+    standing_sex
+    spooning
+    69_position
+
+    ### Sexual Acts
+    fellatio, oral, blowjob, deepthroat
+    vaginal, penetration, sex
+    handjob
+    titjob, paizuri
+    anal
+
+    ### Perspectives & Focus
+    pov, pov_crotch
+    from_behind, from_below, from_above
+    close-up, wide_shot
+    male_focus, female_focus
+
+
+    ### Lighting Types
+    cinematic lighting
+    soft lighting
+    warm golden hour lighting
+    dramatic lighting
+    low key lighting
+    neon lighting
+    bright flash photography
+    radiant god rays
+
+    First - Come up with a femal description - it must be consistent throughout.  
+    Then come up with a combination of {photos} sexual positions, acts and perspectives. 
+    Return XML schema for the image prompts, put each string prompt inside <scene></scene> tags. ONLY use scene tag to contain prompt strings, no other tags.
+    """
+    
+    #PROMPT INSTRUCTIONS FOR AI IMAGE GEN PROMPTS
+    #This creates different people, ai does not create the same person
+    prompt = f"""
+    You create pornographic NSFW content.  First Come up with a look for our model. She will be described THE SAME WAY each time, except for clothing since she could be nude.
+
+    CHRISTMAS THEME!  Winter clothing or nude in a snowy environment, cabin, lodge.  Create a detailed APPEARANCE
+    
+    DESCRIPTION STRUCTURE for the WOMAN ONLY:\n
+    ###Facial Structure
+    - round face, sharp features, high cheekbones
+
+    ### Hair Style
+    - long, short, ponytail, bixi-cut, wavy, straight, curly, bangs, face-framing, wafting, flowing, braided
+    
+    ### Hair Color
+    - chestnut, black, blond, platinum blonde, red, pink, silver
+    
+    ### Iris Color
+    - blue, green, brown, hazel, grey
+
+    ### Eye Accents
+    - long lashes, eye shadow, eyeliner, mascara, dark eyeliner, dark mascara
+    
+    ### Accessories
+    -  glasses, choker, hair color and style, iris color, accents like mascara
+
+    ### Clothing (except when nude)
+    - lingerie, underwear, panties, bra, torn_clothes, clothes_pull, partially_undressed, stockings, thigh_highs, pantyhose, sheer_legwear
+
+    ### Body type
+    - fit, athletic, curvy, thin
+
+    Then develop solo and heterosexual prompts. Use variety of sexual position, sexual act and perspectives.  mostly nude, some clothed or bits of clothing.
+
+    combine natural language appearance description with danbooru tags for sexual positions, acts and perspectives.    
+    
+    1. **Underscores**: Always use underscored Danbooru tags for: sexual_position, sex_acts, perspective,  mixing with natural language for the rest of the prompt
+    2. **Front-load important concepts**:only describe the woman, man will auto generate simply using '1boy' as needed 
+    PROMPT STRUCTURE:\nFacial features, accessories like glasses, choker, hair color and style, iris color, accents like mascara, long lashes, eye shadow.\nClothing or nude, naked\nBody type fit, athletic, curvy, thin\ncharacter count, either 1girl, or 1girl 1boy,\nSexual Postion, Act and Perspective tags\nLocation in 1 or 2 words hotel room, hot tub, bed room, forest, cabin, etc.\nLighting 
+    3. **Photography tags have major visual impact**: Camera types and lighting dramatically affect the output
+    4. **Use commas to separate concepts**
+    5. **Parentheses/weight syntax doesn't work** in raw diffusers - they're treated as literal characters
+    6. **Quality matters less than content**: Focus on describing what you want rather than quality tags
+    7. **Experiment with hybrid approaches**: Mix tags and natural language for best results
+
+    ### Body Features & Modifiers
+    - nude, naked, topless, bottomless
+    - breasts, small_breasts, large_breasts
+    - nipples, pussy, penis, erection
+    - spread_legs, legs_apart
+    - straddling
+    - arched_back
+
+    ### Clothing States
+    - lingerie, underwear, panties, bra
+    - torn_clothes, clothes_pull
+    - partially_undressed
+    - stockings, thigh_highs, pantyhose
+    - sheer_legwear
+
+    ### Intimacy & Expression
+    - sex, hetero
+    - kissing, french_kiss
+    - looking_at_viewer, eye_contact
+    - seductive_smile, open_mouth
+    - sweat, saliva
+    
+    ### Character Count
+    - 1girl, 1boy 
+    - 1girl, solo 
+
+    ### Common Sexual Positions
+    - missionary, missionary_position
+    - sex_from_behind, doggystyle
+    - cowgirl_position, girl_on_top, woman_on_top
+    - reverse_cowgirl
+    - standing_sex
+    - spooning
+    - 69_position
+
+    ### Sexual Acts
+    - fellatio, oral, blowjob, deepthroat
+    - vaginal, penetration, sex
+    - handjob
+    - titjob, paizuri
+    - anal
+
+
+    ### Perspectives & Focus
+    - pov, pov_crotch
+    - from_behind, from_below, from_above
+    - close-up, wide_shot
+    - male_focus, female_focus
+
+
+    ### Lighting Types
+    - cinematic lighting
+    - soft lighting
+    - warm golden hour lighting
+    - dramatic lighting
+    - low key lighting
+    - neon lighting
+    - bright flash photography
+    - radiant god rays
+
+    Follow the PROMPT STRUCTURE above - use your female description - keep her consistent throughout.  
+
+    Then come up with a combination of sexual positions, acts and perspectives. Create {photos} prompts for our female
+
+    Return XML schema for the image prompts, put each string prompt inside <scene></scene> tags. ONLY use scene tag to contain prompt strings, no other tags.
+
+    YOU MUST describe the woman exactly the same (except clothing or nude) only the position, act and perspective should change.  Keep prompting short there is a hard limit of 30 words.
+    """
+    
+    
+
+    tries = 0
+    q3_results = []
+    while tries < 3:
+        tries += 1
+        q3_results = qwen_generate(prompt, model_type='vlm')
+        q3_results = extract_scenes(q3_results)
+        if q3_results:
+            break
+        print(f"Attempt {tries} failed, retrying...")
+    print(f"Q3 Generated: {len(q3_results)} scenes, was asked for {photos}")
+    _unload_model()
+    time.sleep(10)
+    tries = 0
+    q25_results = []
+    while tries < 3:
+        tries += 1
+        q25_results = qwen_generate(prompt, model_type='lm')
+        q25_results = extract_scenes(q25_results)
+        if q25_results:
+            break
+        print(f"Attempt {tries} failed, retrying...")
+    print(f"Q2.5 Generated: {len(q25_results)} scenes, was asked for {photos}")
+    _unload_model()
+    time.sleep(10)
+    
+    #Join the two - extract scenes from both and combine into a single list
+    scenes =  q3_results + q25_results
+
+    # Generate ALL images first
+    generated_images = []
+    for shot in scenes:
+        image_prompt = f"photograph, 8k photo, {shot}"
+        print(f"\nGenerating image for shot: {shot}")
+        impath = image_generate(image_prompt, directory=shoot_folder)
+        generated_images.append({'img_path': impath, 'image_prompt': image_prompt})
+        print(f"Generated: {impath}")
+        print("PUSH to image and prompt GCS storage...   ")
+        
+        # Upload image
+        bucket_name = "xserver"
+        filename = os.path.basename(impath)
+        gstorage.upload_blob(bucket_name, impath, f"{shoot_folder}/{filename}")
+        
+        # Upload prompt
+        prompt_filename = f"{os.path.splitext(filename)[0]}.txt"
+        gstorage.upload_blob_from_memory(bucket_name, image_prompt, f"{shoot_folder}/{prompt_filename}")
+
+    
+    # Unload image generation model after all images are done
+    print(f"\nAll {len(generated_images)} images generated. Starting reviews...")
+
+    #unload the image model and free VRAM
+    _ = _unload_image_generate()
+    
+    #NO IMAGE REVIEW for this workflow version
+    #Hold Generated images and their reviews and prompts file path to send to video gen
+    images_paths = []
+
+    print(f"\nSKIP Reviewing generated images...DISABLED FOR SPEED")
+    for img_info in generated_images:
+        impath = img_info['img_path']
+        image_prompt = img_info['image_prompt']
+        
+        #review_result = image_review(impath, image_prompt)
+        review_result = "[Quality]"  #skip review for speed
+        print(f"\nSKIP Reviewing generated images...DISABLED FOR SPEED")
+        
+        print("\n", "!"*50)
+        print(f"Image Source:\n {impath}\n")
+        print(f"\nImage Review Result:\n {review_result}\n")
+        print("\n", "*"*50)
+        
+        
+        images_paths.append({'img_path': impath, 'review_result': review_result, 'image_prompt': image_prompt})
+        print(f"\nReview complete for: {impath}\n")
+
+    #ANIMATION Prompt Generation.
+    for img_info in images_paths:
+        img_path = img_info['img_path']
+        image_prompt = img_info['image_prompt']
+        img_info['review_result'] = review_result
+
+        # INITIAL ANIMATION PROMPT - OPTIMIZED FOR WAN 2.2 I2V MODEL
+        animation_prompt = """Analyze this image and create a prompt to animate it as a 5 second video clip using the Wan 2.2 I2V model.  Understan what the image is depicting and create a NATURAL LANGUAGE description of the erotic sexual motion and camera angle to animate.
+
+CRITICAL RULES FOR WAN 2.2:
+1. Use NATURAL LANGUAGE descriptions only - NO brackets [word] or parentheses (word) - they have no effect in Wan
+2. Describe motion with temporal words: "slowly", "rhythmically", "continuously", "then", "repeating the motion"
+3. Focus on MOTION and CAMERA only - the model gets visual details from the input image
+4. Keep it to 2-4 descriptive sentences
+
+MOTION VOCABULARY:
+- Thrusting rhythmically, hips rocking back and forth, bouncing up and down
+- Head bobbing motion, taking deep then pulling back slowly
+- Body trembling, muscles tensing, arching back, gripping tightly
+- Breasts bouncing, ass jiggling, body swaying, squeezing
+
+CAMERA VOCABULARY:
+- Close-up shot, medium shot, full body view
+- POV perspective, low angle view, overhead shot
+- Camera slowly dollies in, camera follows the motion
+- Side profile, front view, from behind
+
+EXAMPLE PROMPTS:
+"She bounces up and down rhythmically, riding with increasing intensity. Her breasts jiggle with each movement as she grips his chest. Close-up shot slowly dollying in from a low angle."
+
+"He thrusts deeply in a steady rhythm while she moans with pleasure. Her body rocks with each motion as intensity builds. POV perspective capturing her face and bouncing breasts."
+
+"Her head moves up and down in a steady rhythm, taking him deep then slowly pulling back. She maintains eye contact with a pleasured expression. Close-up POV shot."
+
+Create a 2-4 sentence animation prompt for this image. Natural language only, describe the erotic sexual motion and camera angle.
+
+Finally, there are two different animation models based on the content.  Add a tag at the end of your prompt for either: <lora>blowjob</lora> or <lora>sex</lora>. Sex is for ALL secene types that are not a form blowjob or situations where the woman's face is near a penis and may become a blowjob."""
+        result = qwen_generate(animation_prompt, images=[img_path])
+        print("\n","#"*50)
+        print(f"Create movie clip for:  {img_path}")
+        
+        #Generate Movies
+        res = videogen(clips=video_clip_extensions,image_path=img_path, prompt=result,folder=shoot_folder,source_image_review=img_info['review_result'],source_image_prompt=image_prompt)
+        print(res)
+        print("-"*50)
+    
+    #release to help with VRAM
+    _ =_unload_model()
+
+    return True
+
+ 
 def workflow(seed="student teen", img_count=5, lighting="rays of sunlight", scene="library study room", shoot_folder="library"):
+    # Create shoot folder on GCS if it doesn't exist
+    bucket_name = "xserver"
+    gstorage.check_or_create_folder(bucket_name, shoot_folder)
+
     default_model_type = 'vlm'  # 'vlm' or 'lm' for language model only
     img_count = img_count  # Number of images/shots to generate
     seed = seed#"student teen"  # Example seed word for character model
@@ -242,6 +647,15 @@ def workflow(seed="student teen", img_count=5, lighting="rays of sunlight", scen
         impath = image_generate(image_prompt, directory=shoot_folder)
         generated_images.append({'img_path': impath, 'image_prompt': image_prompt})
         print(f"Generated: {impath}")
+        
+        # Upload image
+        bucket_name = "xserver"
+        filename = os.path.basename(impath)
+        gstorage.upload_blob(bucket_name, impath, f"{shoot_folder}/{filename}")
+        
+        # Upload prompt
+        prompt_filename = f"{os.path.splitext(filename)[0]}.txt"
+        gstorage.upload_blob_from_memory(bucket_name, image_prompt, f"{shoot_folder}/{prompt_filename}")
     
     # Unload image generation model after all images are done
     _ = _unload_image_generate()
@@ -347,6 +761,13 @@ def image_review(img_path,image_prompt,review_prompt=None):
     result = qwen_generate(review_prompt, images=[img_path])
     return result
 
+
+def extract_scenes(xml_text):
+    """
+    Extract content from <scene></scene> tags and return as a list of strings.
+    """
+    scenes = re.findall(r'<scene>(.*?)</scene>', xml_text, re.IGNORECASE | re.DOTALL)
+    return [scene.strip() for scene in scenes]
 
 def extract_prompt(xml_prompt, expected_tags=None, min_shots=10):
         """
@@ -549,9 +970,13 @@ if __name__ == "__main__":
     #7.5 Hour RUN TIME LIMIT TEST
     #scenes_count = 5
     #images_per_run = 8
-
-    scenes_count = 4
-    images_per_run = 10
+    _ = workflow_v2()
+    end_time = time.time()
+    print(f"Workflow completed in {end_time - start_time:.2f} seconds.")
+    
+    
+    scenes_count = 0
+    images_per_run = 0
 
     # Run multiple workflow iterations with different seeds
     last_result = {"subject":f"{_random_woman()}", "lighting":f"{_random_lighting()}", "scene":f"{_random_scene()}","name":"jade_027"}

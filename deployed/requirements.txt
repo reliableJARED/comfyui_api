@@ -1,0 +1,17 @@
+# Requirements for xserver_gae.py - Google App Engine Standard
+# Image/Video Gallery Server
+
+# Web framework
+Flask==3.0.0
+gunicorn==21.2.0
+python-dotenv==1.0.0
+
+# Google Cloud Storage
+google-cloud-storage==2.14.0
+
+# Image processing
+Pillow==10.1.0
+
+# Video processing (for thumbnail extraction)
+opencv-python-headless==4.8.1.78
+numpy==1.26.2

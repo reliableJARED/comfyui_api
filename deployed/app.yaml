@@ -1,0 +1,36 @@
+# Google App Engine Standard Environment Configuration
+# For xserver_gae.py - Image/Video Gallery Server
+
+runtime: python312
+
+# Instance configuration
+instance_class: F1  # 256MB RAM, 600MHz CPU - sufficient for low traffic
+
+# Automatic scaling configuration
+automatic_scaling:
+  min_instances: 0
+  max_instances: 3
+  min_idle_instances: 0
+  max_idle_instances: 0  # No idle instances = scales to zero
+  target_cpu_utilization: 0.65
+  target_throughput_utilization: 0.65
+  max_concurrent_requests: 20
+
+# Entry point
+entrypoint: gunicorn -b :$PORT xserver_gae:app --workers 1 --threads 4 --timeout 120
+
+# Environment variables
+env_variables:
+  # GCS bucket name (also defined in code, but can be overridden here)
+  GCS_BUCKET_NAME: "xserver"
+
+# Handlers - route all traffic to the app
+handlers:
+  # All URLs are handled by the Flask app
+  - url: /.*
+    secure: always
+    redirect_http_response_code: 301
+    script: auto
+
+# Service account - uses default App Engine service account
+# Make sure this service account has Storage Object Admin role on the 'xserver' bucket

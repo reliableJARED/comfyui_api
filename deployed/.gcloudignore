@@ -1,0 +1,69 @@
+# Files and directories to ignore during gcloud app deploy
+
+# Git
+.git/
+.gitignore
+
+deployed/service_account.json
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+venv/
+.venv/
+env/
+.env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Local data folders
+xserver/
+kserver/
+faiss_data/
+hippocampus_data/
+demo_rdf_data/
+model_demos/
+v1/
+wan/
+local_llm/
+save/
+
+# Other Python files not needed for GAE
+*.py
+!xserver_gae.py
+
+# Other config files
+*.txt
+!requirements_gae.txt
+!requirements.txt
+
+# Documentation
+*.md
+README*
+
+# Test files
+test_*.py
+*_test.py

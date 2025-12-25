@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ folder_name }} - Images</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #f5f5f5;
+            padding: 20px;
+        }
+        
+        .header {
+            max-width: 1200px;
+            margin: 0 auto 30px;
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .back-link {
+            display: inline-block;
+            color: #667eea;
+            text-decoration: none;
+            margin-bottom: 15px;
+            font-weight: 500;
+        }
+        
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        
+        h1 {
+            color: #333;
+            font-weight: 600;
+        }
+        
+        .image-count {
+            color: #666;
+            font-size: 14px;
+            margin-top: 5px;
+        }
+        
+        .subfolders {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+        }
+        
+        .subfolders h3 {
+            color: #333;
+            font-size: 16px;
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+        
+        .subfolder-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        
+        .subfolder-link {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 500;
+            transition: transform 0.2s ease;
+        }
+        
+        .subfolder-link:hover {
+            color: white;
+            text-decoration: none;
+            transform: translateY(-1px);
+        }
+        
+        .image-grid {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 20px;
+        }
+        
+        .image-item {
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            transition: transform 0.2s ease;
+            position: relative;
+        }
+        
+        .image-item:hover {
+            transform: translateY(-2px);
+        }
+        
+        .image-wrapper {
+            width: 100%;
+            height: 200px;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #f8f9fa;
+            position: relative;
+        }
+        
+        .image-wrapper img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            transition: transform 0.2s ease;
+            cursor: pointer;
+        }
+        
+        .image-item:hover img {
+            transform: scale(1.05);
+        }
+        
+        .video-indicator {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.5);
+            color: white;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            pointer-events: none;
+            backdrop-filter: blur(2px);
+        }
+        
+        .action-buttons {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            display: flex;
+            gap: 5px;
+            z-index: 10;
+        }
+        
+        .action-btn {
+            background: rgba(255, 255, 255, 0.9);
+            border: none;
+            border-radius: 50%;
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 18px;
+            transition: all 0.2s ease;
+            backdrop-filter: blur(5px);
+        }
+        
+        .action-btn:hover {
+            background: rgba(255, 255, 255, 1);
+            transform: scale(1.1);
+        }
+        
+        .favorite-btn.favorited {
+            background: rgba(255, 69, 100, 0.9);
+            color: white;
+        }
+        
+        .favorite-btn.favorited:hover {
+            background: rgba(255, 69, 100, 1);
+        }
+        
+        .delete-btn {
+            background: rgba(255, 99, 71, 0.9);
+            color: white;
+        }
+        
+        .delete-btn:hover {
+            background: rgba(255, 99, 71, 1);
+        }
+        
+        .action-btn.loading {
+            opacity: 0.6;
+            pointer-events: none;
+        }
+        
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.95);
+            backdrop-filter: blur(5px);
+        }
+        
+        .modal-content {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal-image {
+            max-width: 90%;
+            max-height: 90%;
+            object-fit: contain;
+            user-select: none;
+        }
+        
+        .close {
+            position: absolute;
+            top: 20px;
+            right: 30px;
+            color: white;
+            font-size: 40px;
+            font-weight: bold;
+            cursor: pointer;
+            z-index: 1001;
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1;
+        }
+        
+        .close:hover {
+            background: rgba(0, 0, 0, 0.8);
+        }
+        
+        .nav-button {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(0, 0, 0, 0.5);
+            color: white;
+            border: none;
+            font-size: 24px;
+            padding: 15px 20px;
+            cursor: pointer;
+            border-radius: 8px;
+            z-index: 1001;
+            user-select: none;
+        }
+        
+        .nav-button:hover {
+            background: rgba(0, 0, 0, 0.8);
+        }
+        
+        .prev { left: 20px; }
+        .next { right: 20px; }
+        
+        .image-counter {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: white;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            z-index: 1001;
+        }
+        
+        /* Confirmation Dialog */
+        .confirm-dialog {
+            display: none;
+            position: fixed;
+            z-index: 2000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(2px);
+        }
+        
+        .confirm-content {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            max-width: 400px;
+            width: 90%;
+            text-align: center;
+        }
+        
+        .confirm-content h3 {
+            color: #333;
+            margin-bottom: 15px;
+        }
+        
+        .confirm-content p {
+            color: #666;
+            margin-bottom: 25px;
+        }
+        
+        .confirm-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+        
+        .confirm-btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+        }
+        
+        .confirm-btn.delete {
+            background: #ff6347;
+            color: white;
+        }
+        
+        .confirm-btn.cancel {
+            background: #f0f0f0;
+            color: #333;
+        }
+        
+        .image-name {
+            padding: 15px;
+            font-size: 14px;
+            color: #333;
+            word-break: break-all;
+            background: white;
+        }
+        
+        .no-images {
+            max-width: 1200px;
+            margin: 0 auto;
+            text-align: center;
+            color: #666;
+            padding: 40px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        @media (max-width: 600px) {
+            body { padding: 10px; }
+            .header { padding: 15px; }
+            .image-grid {
+                grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+                gap: 15px;
+            }
+            .image-wrapper { height: 150px; }
+            .image-name { padding: 10px; font-size: 12px; }
+            .action-btn { width: 32px; height: 32px; font-size: 16px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        {% if parent_folder %}
+        <a href="/folder/{{ parent_folder }}" class="back-link">← Back to {{ parent_folder }}</a>
+        {% else %}
+        <a href="/" class="back-link">← Back to Folders</a>
+        {% endif %}
+        <h1>📂 {{ folder_name }}</h1>
+        <div class="image-count">{{ image_count }} images</div>
+        
+        {% if subfolders %}
+            <div class="subfolders">
+                <h3>📁 Subfolders</h3>
+                <div class="subfolder-list">
+                    {% for subfolder in subfolders %}
+                        <a href="/folder/{{ folder_path }}/{{ subfolder }}" class="subfolder-link">
+                            {{ subfolder }}
+                        </a>
+                    {% endfor %}
+                </div>
+            </div>
+        {% endif %}
+    </div>
+    
+    {% if images %}
+        <div class="image-grid">
+            {% for image in images %}
+                <div class="image-item">
+                    <div class="image-wrapper">
+                        {% if image.endswith(('.mp4', '.webm', '.mov', '.avi', '.mkv')) %}
+                        <img src="/thumbnail/{{ folder_path }}/{{ image }}" 
+                             alt="{{ image }}"
+                             loading="lazy"
+                             onclick="openModal({{ loop.index0 }})">
+                        <div class="video-indicator">▶</div>
+                        {% else %}
+                        <img src="/thumbnail/{{ folder_path }}/{{ image }}" 
+                             alt="{{ image }}" 
+                             loading="lazy"
+                             onclick="openModal({{ loop.index0 }})">
+                        {% endif %}
+                        <div class="action-buttons">
+                            <button class="action-btn favorite-btn {% if favorites[folder_path ~ '/' ~ image] %}favorited{% endif %}" 
+                                    onclick="toggleFavorite(event, '{{ folder_path }}/{{ image }}', this)"
+                                    data-image-path="{{ folder_path }}/{{ image }}"
+                                    title="Add to favorites">
+                                {% if favorites[folder_path ~ '/' ~ image] %}❤️{% else %}🤍{% endif %}
+                            </button>
+                            {% if favorites[folder_path ~ '/' ~ image] %}
+                            <button class="action-btn delete-btn" 
+                                    onclick="confirmDelete(event, '{{ folder_path }}/{{ image }}', this)"
+                                    data-image-path="{{ folder_path }}/{{ image }}"
+                                    title="Delete image">
+                                👎
+                            </button>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="image-name">{{ image }}</div>
+                </div>
+            {% endfor %}
+        </div>
+        
+        <!-- Modal -->
+        <div id="imageModal" class="modal">
+            <div class="modal-content">
+                <span class="close" onclick="closeModal()">&times;</span>
+                <button class="nav-button prev" onclick="changeImage(-1)">‹</button>
+                <img class="modal-image" id="modalImage" src="" alt="">
+                <video class="modal-image" id="modalVideo" src="" controls loop playsinline style="display:none;"></video>
+                <button class="nav-button next" onclick="changeImage(1)">›</button>
+                <div class="image-counter">
+                    <span id="currentImageNum">1</span> / <span id="totalImages">{{ image_count }}</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Confirmation Dialog -->
+        <div id="confirmDialog" class="confirm-dialog">
+            <div class="confirm-content">
+                <h3>Delete Image</h3>
+                <p>Are you sure you want to permanently delete this image? This action cannot be undone.</p>
+                <div class="confirm-buttons">
+                    <button class="confirm-btn delete" onclick="executeDelete()">Delete</button>
+                    <button class="confirm-btn cancel" onclick="cancelDelete()">Cancel</button>
+                </div>
+            </div>
+        </div>
+    {% else %}
+        <div class="no-images">
+            No media files found in this folder.
+        </div>
+    {% endif %}
+    
+    <script>
+        const MAX_FAVORITES = 50;
+        
+        const images = [
+            {% for image in images %}
+            {
+                src: "/image/{{ folder_path }}/{{ image }}",
+                name: "{{ image }}",
+                path: "{{ folder_path }}/{{ image }}",
+                isVideo: {{ 'true' if image.endswith(('.mp4', '.webm', '.mov', '.avi', '.mkv')) else 'false' }}
+            }{% if not loop.last %},{% endif %}
+            {% endfor %}
+        ];
+        
+        let currentImageIndex = 0;
+        let pendingDeletePath = null;
+        let pendingDeleteButton = null;
+        const modal = document.getElementById('imageModal');
+        const modalImage = document.getElementById('modalImage');
+        const modalVideo = document.getElementById('modalVideo');
+        const currentImageNum = document.getElementById('currentImageNum');
+        const totalImages = document.getElementById('totalImages');
+        const confirmDialog = document.getElementById('confirmDialog');
+        
+        function openModal(imageIndex) {
+            currentImageIndex = imageIndex;
+            showImage();
+            modal.style.display = 'block';
+            document.body.style.overflow = 'hidden';
+        }
+        
+        function closeModal() {
+            modal.style.display = 'none';
+            document.body.style.overflow = 'auto';
+            if (modalVideo) {
+                modalVideo.pause();
+                modalVideo.currentTime = 0;
+            }
+        }
+        
+        function changeImage(direction) {
+            currentImageIndex += direction;
+            if (currentImageIndex >= images.length) currentImageIndex = 0;
+            else if (currentImageIndex < 0) currentImageIndex = images.length - 1;
+            showImage();
+        }
+        
+        function showImage() {
+            if (images.length > 0) {
+                const currentItem = images[currentImageIndex];
+                currentImageNum.textContent = currentImageIndex + 1;
+                
+                if (currentItem.isVideo) {
+                    modalImage.style.display = 'none';
+                    modalVideo.style.display = 'block';
+                    modalVideo.src = currentItem.src;
+                    modalVideo.play();
+                } else {
+                    modalVideo.style.display = 'none';
+                    modalVideo.pause();
+                    modalImage.style.display = 'block';
+                    modalImage.src = currentItem.src;
+                    modalImage.alt = currentItem.name;
+                }
+                
+                const prevBtn = document.querySelector('.prev');
+                const nextBtn = document.querySelector('.next');
+                
+                if (images.length <= 1) {
+                    prevBtn.style.display = 'none';
+                    nextBtn.style.display = 'none';
+                } else {
+                    prevBtn.style.display = 'block';
+                    nextBtn.style.display = 'block';
+                }
+            }
+        }
+        
+        async function toggleFavorite(event, imagePath, button) {
+            event.stopPropagation();
+            button.classList.add('loading');
+            
+            const isFavorited = button.classList.contains('favorited');
+            const action = isFavorited ? 'remove' : 'add';
+            
+            try {
+                const response = await fetch('/api/favorite', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: action, image_path: imagePath })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    if (action === 'add') {
+                        button.classList.add('favorited');
+                        button.textContent = '❤️';
+                        showDeleteButton(button, imagePath);
+                    } else {
+                        button.classList.remove('favorited');
+                        button.textContent = '🤍';
+                        hideDeleteButton(button);
+                    }
+                } else {
+                    alert('Failed to update favorite: ' + result.error);
+                }
+            } catch (error) {
+                alert('Error updating favorite. Please try again.');
+            } finally {
+                button.classList.remove('loading');
+            }
+        }
+        
+        function confirmDelete(event, imagePath, button) {
+            event.stopPropagation();
+            pendingDeletePath = imagePath;
+            pendingDeleteButton = button;
+            confirmDialog.style.display = 'block';
+        }
+        
+        function cancelDelete() {
+            confirmDialog.style.display = 'none';
+            pendingDeletePath = null;
+            pendingDeleteButton = null;
+        }
+        
+        async function executeDelete() {
+            if (!pendingDeletePath || !pendingDeleteButton) {
+                cancelDelete();
+                return;
+            }
+            
+            confirmDialog.style.display = 'none';
+            pendingDeleteButton.classList.add('loading');
+            pendingDeleteButton.disabled = true;
+            
+            try {
+                const response = await fetch('/api/delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ image_path: pendingDeletePath })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    const imageItem = pendingDeleteButton.closest('.image-item');
+                    if (imageItem) {
+                        imageItem.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+                        imageItem.style.opacity = '0';
+                        imageItem.style.transform = 'scale(0.8)';
+                        setTimeout(() => {
+                            imageItem.remove();
+                            updateImageCount();
+                        }, 300);
+                    }
+                    
+                    const imageIndex = images.findIndex(img => img.path === pendingDeletePath);
+                    if (imageIndex !== -1) images.splice(imageIndex, 1);
+                } else {
+                    alert('Failed to delete image: ' + result.error);
+                    pendingDeleteButton.classList.remove('loading');
+                    pendingDeleteButton.disabled = false;
+                }
+            } catch (error) {
+                alert('Error deleting image. Please try again.');
+                pendingDeleteButton.classList.remove('loading');
+                pendingDeleteButton.disabled = false;
+            } finally {
+                pendingDeletePath = null;
+                pendingDeleteButton = null;
+            }
+        }
+        
+        function showDeleteButton(favoriteButton, imagePath) {
+            const actionButtons = favoriteButton.parentElement;
+            const existingDeleteBtn = actionButtons.querySelector('.delete-btn');
+            
+            if (!existingDeleteBtn) {
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'action-btn delete-btn';
+                deleteBtn.onclick = (e) => confirmDelete(e, imagePath, deleteBtn);
+                deleteBtn.setAttribute('data-image-path', imagePath);
+                deleteBtn.setAttribute('title', 'Delete image');
+                deleteBtn.textContent = '👎';
+                actionButtons.appendChild(deleteBtn);
+            }
+        }
+        
+        function hideDeleteButton(favoriteButton) {
+            const actionButtons = favoriteButton.parentElement;
+            const deleteBtn = actionButtons.querySelector('.delete-btn');
+            if (deleteBtn) deleteBtn.remove();
+        }
+        
+        function updateImageCount() {
+            const imageCountElement = document.querySelector('.image-count');
+            const currentCount = document.querySelectorAll('.image-item').length;
+            imageCountElement.textContent = currentCount + ' images';
+            totalImages.textContent = currentCount;
+            
+            if (currentCount === 0) {
+                const imageGrid = document.querySelector('.image-grid');
+                imageGrid.innerHTML = '<div class="no-images">No media files found in this folder.</div>';
+            }
+        }
+        
+        document.addEventListener('keydown', function(e) {
+            if (modal.style.display === 'block') {
+                switch(e.key) {
+                    case 'Escape': closeModal(); break;
+                    case 'ArrowLeft': if (images.length > 1) changeImage(-1); break;
+                    case 'ArrowRight': if (images.length > 1) changeImage(1); break;
+                }
+            } else if (confirmDialog.style.display === 'block') {
+                if (e.key === 'Escape') cancelDelete();
+            }
+        });
+        
+        modal.addEventListener('click', function(e) {
+            if (e.target === modal) closeModal();
+        });
+        
+        confirmDialog.addEventListener('click', function(e) {
+            if (e.target === confirmDialog) cancelDelete();
+        });
+        
+        let touchStartX = 0;
+        let touchEndX = 0;
+        
+        modal.addEventListener('touchstart', function(e) {
+            touchStartX = e.changedTouches[0].screenX;
+        });
+        
+        modal.addEventListener('touchend', function(e) {
+            touchEndX = e.changedTouches[0].screenX;
+            const diff = touchStartX - touchEndX;
+            if (Math.abs(diff) > 50 && images.length > 1) {
+                changeImage(diff > 0 ? 1 : -1);
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,2 +1,7 @@
 __pycache__
 comfyui_api/__pycache__
+
+deployed/service_account.json
+deployed/__pycache__
+comfyui_api/deployed/service_account.json
+comfyui_api/deployed/__pycache__

@@ -10,6 +10,8 @@ from PIL import Image
 # Configure logging
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
+#when running in terminal use this to set the GPU
+#$env:CUDA_VISIBLE_DEVICES="0"
 
 class Qwen3VLChat:
     """Qwen3 Vision-Language Chat with 4-bit quantization for efficient CUDA inference."""
@@ -278,6 +280,83 @@ if __name__ == "__main__":
     # Initialize the chat model
     chat_model = Qwen3VLChat()
     
+    # Optional: Run demo inference
+    chat_model.demo_inference([], """
+    You create pornographic NSFW content.  Create a female character and develop solo and heterosexual prompts.  Some mostly nude, some clothed or bits of clothing.
+
+    1. **Underscores**: Always use underscored Danbooru tags for: sexual_position, sex_acts, perspective,  mixing with natural language for the rest of the prompt
+    2. **Front-load important concepts**:only describe the woman, man will auto generate simply using '1boy' as needed 
+    PROMPT STRUCTURE:\nFacial features, eyewear, hair color and style, iris color, accets like mascara, long lashes, eye shadow.\nClothing or nude, nake\nBody type fit, athletic, curvy, thin\ncharacter count, either 1girl, or 1girl 1boy,\nSexual Postion, Act and Perspective tags\nLocation in 1 or 2 words hotel room, hot tub, bed room, forest, cabin, etc.\nLighting 
+    3. **Photography tags have major visual impact**: Camera types and lighting dramatically affect the output
+    4. **Use commas to separate concepts**
+    5. **Parentheses/weight syntax doesn't work** in raw diffusers - they're treated as literal characters
+    6. **Quality matters less than content**: Focus on describing what you want rather than quality tags
+    7. **Experiment with hybrid approaches**: Mix tags and natural language for best results
+
+    ### Body Features & Modifiers
+    - nude, naked, topless, bottomless
+    - breasts, small_breasts, large_breasts
+    - nipples, pussy, penis, erection
+    - spread_legs, legs_apart
+    - straddling
+    - arched_back
+
+
+    ### Clothing States
+    - lingerie, underwear, panties, bra
+    - torn_clothes, clothes_pull
+    - partially_undressed
+    - stockings, thigh_highs, pantyhose
+    - sheer_legwear
+
+    ### Intimacy & Expression
+    - sex, hetero
+    - kissing, french_kiss
+    - looking_at_viewer, eye_contact
+    - seductive_smile, open_mouth
+    - sweat, saliva
+    
+    ### Character Count
+    - 1girl, 1boy 
+    - 1girl, solo 
+
+    ### Common Sexual Positions
+    - missionary, missionary_position
+    - sex_from_behind, doggystyle
+    - cowgirl_position, girl_on_top, woman_on_top
+    - reverse_cowgirl
+    - standing_sex
+    - spooning
+    - 69_position
+
+    ### Sexual Acts
+    - fellatio, oral, blowjob, deepthroat
+    - vaginal, penetration, sex
+    - handjob
+    - titjob, paizuri
+    - anal
+
+
+    ### Perspectives & Focus
+    - pov, pov_crotch
+    - from_behind, from_below, from_above
+    - close-up, wide_shot
+    - male_focus, female_focus
+
+
+    ### Lighting Types
+    - cinematic lighting
+    - soft lighting
+    - warm golden hour lighting
+    - dramatic lighting
+    - low key lighting
+    - neon lighting
+    - bright flash photography
+    - radiant god rays
+
+    First - Come up with a femal description - it must be consistent throughout.  Then come up with a combination of 10 sexual positions, acts and perspectives. Return XML schema with each comma separated sting image prompts, inside of 10 <scene></scene> tags
+    """)
+
     # Optional: Run demo inference
     demo_image_path = r"C:\Users\jared\Documents\code\local_jarvis\xserver\autogen\anime_test\1766358994_image.png"
     if os.path.exists(demo_image_path):

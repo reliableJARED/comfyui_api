@@ -12,6 +12,9 @@ chat_model = None
 image_model = None
 LOW_VRAM_MODE = False  # Set to True to optimize for low VRAM usage
 
+#when running in terminal use this to set the GPU
+#$env:CUDA_VISIBLE_DEVICES="0"
+
 def load_model(type='vlm'):
     # Initialize the model globally
     # This will load the model when the script starts
@@ -286,9 +289,18 @@ def generate():
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
-    #set GPU available before starting flask app
-    #os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+    #set to GPU 1 by default
+    import os
+    os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+    print("CUDA_VISIBLE_DEVICES set to 1")
 
     # Run on 0.0.0.0 to be accessible, port 5055
     # debug=False is important to prevent the reloader from loading the model twice
-    app.run(host='0.0.0.0', port=5055, debug=False)
+    port=5055
+    app.run(host='0.0.0.0', port=port, debug=False)
+    
+    print("Starting Qwen3VL, Qwen Chat Server and Image Generation Server on GPU 1...")
+    print(f"Server is running on http://0.0.0.0:{port}")
+
+
+

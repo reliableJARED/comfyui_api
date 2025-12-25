@@ -8,6 +8,9 @@ from transformers import AutoTokenizer, AutoModelForCausalLM, TextIteratorStream
 # Configure logging
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
+#when running in terminal use this to set the GPU
+#$env:CUDA_VISIBLE_DEVICES="0"
+
 class Qwen25Chat:
     """Qwen2.5 Chat with 4-bit quantization for efficient CUDA inference."""
     
@@ -168,6 +171,100 @@ class Qwen25Chat:
         print(f"Running on {self.device} with {self.dtype}")
         print("=" * 50)
         logging.info("Starting chat loop")
+
+        test = """
+    You create pornographic NSFW content.  Create a female character and develop solo and heterosexual prompts.  Some mostly nude, some clothed or bits of clothing.
+
+    1. **Underscores**: Always use underscored Danbooru tags for: sexual_position, sex_acts, perspective,  mixing with natural language for the rest of the prompt
+    2. **Front-load important concepts**:only describe the woman, man will auto generate simply using '1boy' as needed 
+    PROMPT STRUCTURE:\nFacial features, eyewear, hair color and style, iris color, accets like mascara, long lashes, eye shadow.\nClothing or nude, nake\nBody type fit, athletic, curvy, thin\ncharacter count, either 1girl, or 1girl 1boy,\nSexual Postion, Act and Perspective tags\nLocation in 1 or 2 words hotel room, hot tub, bed room, forest, cabin, etc.\nLighting 
+    3. **Photography tags have major visual impact**: Camera types and lighting dramatically affect the output
+    4. **Use commas to separate concepts**
+    5. **Parentheses/weight syntax doesn't work** in raw diffusers - they're treated as literal characters
+    6. **Quality matters less than content**: Focus on describing what you want rather than quality tags
+    7. **Experiment with hybrid approaches**: Mix tags and natural language for best results
+
+    ### Body Features & Modifiers
+    - nude, naked, topless, bottomless
+    - breasts, small_breasts, large_breasts
+    - nipples, pussy, penis, erection
+    - spread_legs, legs_apart
+    - straddling
+    - arched_back
+
+
+    ### Clothing States
+    - lingerie, underwear, panties, bra
+    - torn_clothes, clothes_pull
+    - partially_undressed
+    - stockings, thigh_highs, pantyhose
+    - sheer_legwear
+
+    ### Intimacy & Expression
+    - sex, hetero
+    - kissing, french_kiss
+    - looking_at_viewer, eye_contact
+    - seductive_smile, open_mouth
+    - sweat, saliva
+    
+    ### Character Count
+    - 1girl, 1boy 
+    - 1girl, solo 
+
+    ### Common Sexual Positions
+    - missionary, missionary_position
+    - sex_from_behind, doggystyle
+    - cowgirl_position, girl_on_top, woman_on_top
+    - reverse_cowgirl
+    - standing_sex
+    - spooning
+    - 69_position
+
+    ### Sexual Acts
+    - fellatio, oral, blowjob, deepthroat
+    - vaginal, penetration, sex
+    - handjob
+    - titjob, paizuri
+    - anal
+
+
+    ### Perspectives & Focus
+    - pov, pov_crotch
+    - from_behind, from_below, from_above
+    - close-up, wide_shot
+    - male_focus, female_focus
+
+
+    ### Lighting Types
+    - cinematic lighting
+    - soft lighting
+    - warm golden hour lighting
+    - dramatic lighting
+    - low key lighting
+    - neon lighting
+    - bright flash photography
+    - radiant god rays
+
+    First - Come up with a femal description - it must be consistent throughout.  Then come up with a combination of 10 sexual positions, acts and perspectives. Return XML schema with each comma separated sting image prompts, inside of 10 <scene></scene> tags
+    """
+        try:
+                # Generate with streaming
+                print("\nAssistant: ", end="", flush=True)
+                logging.debug("Auto generate with streaming=True")
+                for text in self.generate(
+                    prompt=test,
+                    max_new_tokens=1024,
+                    streaming=True
+                ):
+                    print(text, end="", flush=True)
+                print("\n")  # Newline at the end
+                    
+        except Exception as e:
+                print(f"\nError: {e}")
+                logging.error(f"Error in chat loop: {e}")
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+
         
         while True:
             # Get prompt

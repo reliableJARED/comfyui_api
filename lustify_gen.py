@@ -47,7 +47,7 @@ class ImageGenerator:
         if self.animated:
             self.model_name="UnfilteredAI/NSFW-GEN-ANIME"
         else:  
-            self.model_name="TheImposterImposters/LUSTIFY-v4.0"
+            self.model_name="TheImposterImposters/LUSTIFY-v4.0"#"TheImposterImposters/LUSTIFY-v2.0"
         
         # Enhanced device configuration for Mac and CUDA
         self.device = self._get_best_device(use_mps, use_cuda)
@@ -164,12 +164,13 @@ class ImageGenerator:
                 "use_safetensors": True,
             }
             
-            # Set torch_dtype based on device
-            #Keyword arguments {'dtype': torch.float16} are not expected by StableDiffusionXLPipeline and will be ignored.
-            """if self.is_cuda:
-                kwargs["dtype"] = torch.float16  # CUDA works well with float16
+            # Set torch_dtype based on device - SDXL was trained in float16
+            if self.is_cuda:
+                kwargs["torch_dtype"] = torch.float16  # Native SDXL precision, best quality + speed
+            elif self.is_mps:
+                kwargs["torch_dtype"] = torch.float32  # MPS works better with float32
             else:
-                kwargs["dtype"] = torch.float32  # MPS and CPU work better with float32"""
+                kwargs["torch_dtype"] = torch.float32  # CPU needs float32
             
             # Load the appropriate pipeline
             print("Downloading/loading model (this may take a few minutes on first run)...")
@@ -200,10 +201,6 @@ class ImageGenerator:
                 print("🔧 Applying CUDA optimizations...")
                 if hasattr(pipe, 'enable_attention_slicing'):
                     pipe.enable_attention_slicing()
-                
-                # Enable TensorFloat32 for better performance on Ampere+ GPUs
-                torch.set_float32_matmul_precision('high')
-                print("✓ TensorFloat32 precision enabled for faster matmul")
                 
                 # Enable memory efficient attention if available
                 try:
@@ -279,8 +276,8 @@ class ImageGenerator:
                  sub_folder = "autogen",
                  shoot_folder = "shoots",
                  output_dir=None,
-                 num_inference_steps=40,  # SDXL benefits from 40+ steps for finer details
-                 guidance_scale=7.5,      # 7-9 range gives better prompt adherence and sharper details
+                 num_inference_steps=30,  # SDXL: 50-60 steps for better face detail
+                 guidance_scale=5.5,      # Lower CFG (5-7) reduces face deformations
                  width=1024,
                  height=1024,
                  use_enhanced_prompting=True,  # adds LUSTIFY-specific tags
@@ -336,10 +333,10 @@ class ImageGenerator:
             # CUDA can handle full resolution and steps efficiently
             print(f"🚀 Running on CUDA - Full SDXL resolution: {width}x{height}, {num_inference_steps} steps")
         
-        # Add LUSTIFY-specific negative prompt for better quality
+        # Add LUSTIFY-specific negative prompt for better quality (especially faces)
         negative_prompt = kwargs.pop('negative_prompt', None)
         if not negative_prompt:
-            negative_prompt = "blurry, low quality, distorted, deformed, extra limbs, bad anatomy, hands, ugly, disfigured, poorly drawn, amateur, overexposed, underexposed, out of focus, watermark, signature, text"
+            negative_prompt = "blurry, low quality, distorted, deformed, extra limbs, bad anatomy, hands"
         
         # Generation parameters
         generation_kwargs = {
@@ -360,8 +357,8 @@ class ImageGenerator:
                     with torch.autocast(device_type='cpu', enabled=False):
                         result = pipe(prompt, **generation_kwargs)
                 elif self.is_cuda:
-                    # Use autocast for CUDA to improve performance
-                    with torch.autocast(device_type='cuda', dtype=torch.float32):
+                    # float16 is SDXL's native precision - best quality and speed
+                    with torch.autocast(device_type='cuda', dtype=torch.float16):
                         result = pipe(prompt, **generation_kwargs)
                 else:
                     # CPU inference
@@ -453,13 +450,13 @@ class ImageGenerator:
  
 if __name__ == "__main__":
     # Example usage
-    ts = time.time()
-    generator = ImageGenerator(use_mps=False, animated=True)
-    #prompt = "deepthroat blow job, 1girl 1man, the girl, fair skin, straight long blond hair, angular face, dark mascara, natural plump breasts, nude, edge of hotel by pool. she is in the water, his penis is in her mouth, he is sitting on the pool edge. View from the side, 3d high res render animation"
-    prompt = "nsfw, low_squat hips almost touching the ground,long straight black hair, iris is light purple, angular features, thin black choker necklace, wearing black lace braw, black knee high nylons, pleated black vinyl minis kirt, black high heels. 2.5D realistic animation, front view"
-    prompt = "nsfw, cosmic background, wide_stance feet planted far apart, chest forward, hips back, long straight black hair, iris is light purple, angular features, thin black choker, black lace braw, black knee high nylons, pleated purple vinyl minis kirt, black high heels. hentai realistic animation, front view"
+    ts = int(time.time())
+    generator = ImageGenerator(use_mps=False, animated=False)
+    prompt = "photograph, real photo missionary_position,1girl, a sexy white skin woman, short face framing red hair, glasses, high cheekbones, full lips, white-eye blue iris, long lashes,32B breast, black mascara, she is lying on her back, 1boy, POV, soft lighting, 8k"
+    #prompt = "nsfw, low_squat hips almost touching the ground,long straight black hair, iris is light purple, angular features, thin black choker necklace, wearing black lace braw, black knee high nylons, pleated black vinyl minis kirt, black high heels. 2.5D realistic animation, front view"
+    #prompt = "nsfw, cosmic background, wide_stance feet planted far apart, chest forward, hips back, long straight black hair, iris is light purple, angular features, thin black choker, black lace braw, black knee high nylons, pleated purple vinyl minis kirt, black high heels. hentai realistic animation, front view"
 
-    output_path = generator.text_to_image(prompt, output_file=f"{ts}_anime_gen_test.png")
+    output_path = generator.text_to_image(prompt, output_file=f"{ts}_lustify_gen_test.png")
     #save prompt
     prompt_file = output_path.replace(".png", f"{ts}_prompt.txt")
     with open(prompt_file, 'w') as f:

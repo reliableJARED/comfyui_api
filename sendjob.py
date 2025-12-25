@@ -76,6 +76,10 @@ def download_file(filename, subfolder, folder_type):
         return response.read()
     
 # ================= MAIN LOGIC =================
+#TODO: unload models after inference to free up VRAM when implementing Mixture of LORA approach
+## After your inference - assuming that is where COMFY_SERVER is defined
+#requests.post('http://localhost:8188/free', json={'unload_models': True})
+#
 if __name__ == "__main__":
     # 1. Connect to WebSocket
     ws = websocket.WebSocket()
