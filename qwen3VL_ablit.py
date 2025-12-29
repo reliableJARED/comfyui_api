@@ -16,13 +16,13 @@ logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %
 class Qwen3VLChat:
     """Qwen3 Vision-Language Chat with 4-bit quantization for efficient CUDA inference."""
     
-    def __init__(self, model_id="huihui-ai/Huihui-Qwen3-VL-8B-Instruct-abliterated"):
+    def __init__(self, model_id="huihui-ai/Huihui-Qwen3-VL-8B-Instruct-abliterated", system_prompt=False):
         """Initialize the model with 4-bit quantization."""
         logging.debug(f"Initializing Qwen3VLChat with model_id: {model_id}")
         self.model_id = model_id
         self.device = "cuda:0" if torch.cuda.is_available() else "cpu"
         self.dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
-        
+        self.system_prompt = False
         logging.info(f"Using device: {self.device}, dtype: {self.dtype}")
         
         # Enable TF32 for faster computation on Ampere+ GPUs
@@ -34,6 +34,11 @@ class Qwen3VLChat:
         # Initialize model and processor
         self._setup_model()
         logging.debug("Initialization complete")
+
+    def set_system_prompt(self, system_prompt):
+        """Set a custom system prompt for the model."""
+        logging.debug(f"Setting system prompt: {system_prompt}")
+        self.system_prompt = system_prompt
         
     def _setup_model(self):
         """Load model with 4-bit quantization configuration."""
@@ -133,7 +138,11 @@ class Qwen3VLChat:
         
         content.append({"type": "text", "text": prompt})
         
-        messages = [{"role": "user", "content": content}]
+        if self.system_prompt:
+            print("Adding system prompt to messages")
+            messages = [{"role": "system", "content": self.system_prompt},{"role": "user", "content": content}]
+        else:
+            messages = [{"role": "user", "content": content}]
         
         # Prepare inputs
         with torch.inference_mode():
@@ -151,6 +160,36 @@ class Qwen3VLChat:
             else:
                 return self._generate_standard(inputs, max_new_tokens)
     
+    def api_generate(self, messages=[], max_new_tokens=2048, streaming=False):
+        """API-style generation method."""
+        logging.debug(f"API generate called with messages: {messages}")
+        if not messages:
+            logging.error("No messages provided for API generation. send a list of messages using the format [{'role': 'user'|'assistant'|'system', 'content': '...'}, ...]")
+            return ""
+        
+        if self.system_prompt:
+            #check if system prompt already in messages
+            if not any(msg['role'] == 'system' for msg in messages):
+                #add system prompt at the beginning, based on set system prompt
+                messages.insert(0, {"role": "system", "content": self.system_prompt})
+        
+        # Prepare inputs
+        with torch.inference_mode():
+            logging.debug("Preparing inputs for API generation")
+            inputs = self.tokenizer.apply_chat_template(
+                messages,
+                add_generation_prompt=True,
+                tokenize=True,
+                return_dict=True,
+                return_tensors="pt",
+            ).to(self.model.device)
+            
+            # Standard generation
+            if streaming:
+                return self._generate_streaming(inputs, max_new_tokens)
+            else:
+                return self._generate_standard(inputs, max_new_tokens)
+                
     def _generate_standard(self, inputs, max_new_tokens):
         """Non-streaming generation."""
         logging.debug("Starting standard generation")
@@ -268,7 +307,7 @@ class Qwen3VLChat:
         print(f"Response: ", end="", flush=True)
         
         try:
-            response = self.generate(prompt=prompt, images=image_path, max_new_tokens=1024)
+            response = self.generate(prompt=prompt, images=image_path, max_new_tokens=2048)
             print(response)
             return response
         except Exception as e:

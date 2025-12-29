@@ -73,6 +73,11 @@ def videogen(clips=1,image_path="", prompt="",folder="neon",source_image_review=
     lora = lora #default LORA model to use for video generation based on content
     clear_vram = True #default when starting video gen to clear vram between clips
     while counter < clips:
+        #TODO:
+        #
+        #Add logic to analyze optical flow between ending fames so we can continue moving objects smoothly in the right direction (CV2 Optical Flow tools)
+        #Add logic to detect faces and their positions to maintain continuity (pretrained YOLO model?)
+        #
         counter += 1
         print(f"Generating clip {counter} of {clips}...")
         #Check the initial prompt to determine if LORA should be overridden
@@ -126,9 +131,9 @@ def videogen(clips=1,image_path="", prompt="",folder="neon",source_image_review=
         end_image = result['image_final']
         #create a new prompt for VLM model - OPTIMIZED FOR WAN 2.2 I2V MODEL
         last_frame_prompt_modifier = "You need to animate the FINAL clip of the video.  It should end in an orgaism, or she should move in to a position (if she isn't in one already) to receive a facial cumshot.  The image should clearly show the action and camera angle to be animated in the next clip."
-        prompt = f"""The image you are looking at is the LAST FRAME of a video generated with this prompt: {animation_prompt}
+        prompt = f"""The image you are looking at is the LAST FRAME of a video generated with this prompt: {animation_prompt}. {"Determine if it is a blowjob type images (either active or penis is very close to mouth), or a sexual act (vaginal or anal penitration), or general nudity. If blowjob, move to animate a facial, if sexual or nudity find a non-facial way to end." if counter == clips else "Determine if it is a blowjob type image (either active or penis is very close to mouth), or a sexual act (vaginal or anal penitration), or general nudity."}
 
-Your task: Create a NEW continuation prompt for the Wan 2.2 I2V video model. This model requires NATURAL LANGUAGE descriptions, NOT tag-based prompts.
+Your task: Create a NEW continuation prompt for the Wan 2.2 I2V video model. The animation model requires NATURAL LANGUAGE descriptions, NOT tag-based prompts.
 
 {last_frame_prompt_modifier if counter == clips else ""}
 
@@ -168,7 +173,7 @@ EXAMPLE PROMPTS:
 
 Now analyze the image and create a NEW 2-4 sentence prompt describing the MOTION to animate and CAMERA angle. The image should guide you. if it's already a blowjob stick with that style, if it's sex or any penis entering a vagina or anus stick with that. Natural language only, no brackets or tags.
 
-Finally, let the model know which LORA to use based on the content by including one of these three options: {"<lora>blowjob</lora> or <lora>sex</lora>. Sex is for all secene types not blowjob or facial." if counter != clips else "<lora>facial</lora>, or <lora>sex</lora> . Sex is for any scene not ending in a facial."}"""
+Finally, let the model know which LORA to use based on the content by including one of these three options: {"<lora>blowjob</lora> or <lora>sex</lora>. Sex is for all secene types not blowjob or facial." if counter != clips else "<lora>facial</lora>, or <lora>sex</lora>. Sex is for any scene not ending in a facial."}"""
         #set next image and prompt if we need it
         animation_prompt = qwen_generate(prompt, images=[end_image])
         start_image = end_image
@@ -231,7 +236,7 @@ def rear_doggystyle_workflow():
 def front_doggystyle_workflow():
     return
 
-def workflow_v2(shoot_folder="dec24_workflow_test6"):
+def workflow_v2(shoot_folder="dec26_workflow_test"):
     # Create shoot folder on GCS if it doesn't exist
     bucket_name = "xserver"
     gstorage.check_or_create_folder(bucket_name, shoot_folder)
@@ -322,7 +327,7 @@ def workflow_v2(shoot_folder="dec24_workflow_test6"):
     #PROMPT INSTRUCTIONS FOR AI IMAGE GEN PROMPTS
     #This creates different people, ai does not create the same person
     prompt = f"""
-    You create pornographic NSFW content.  First Come up with a look for our model. She will be described THE SAME WAY each time, except for clothing since she could be nude.
+    You create pornographic NSFW content.  First Come up with a look for our model. She will be described THE SAME WAY each time (except when nude the clothing wouldn't be described).
     
     DESCRIPTION STRUCTURE for the WOMAN ONLY:\n
     ###Facial Structure
@@ -332,10 +337,10 @@ def workflow_v2(shoot_folder="dec24_workflow_test6"):
     - long, short, ponytail, bixi-cut, wavy, straight, curly, bangs, face-framing, wafting, flowing, braided
     
     ### Hair Color
-    - chestnut, black, blond, platinum blonde, red, pink, silver
+    - chestnut, black, blond, platinum blonde, red, pink, silver, purple, highlighted
     
     ### Iris Color
-    - blue, green, brown, hazel, grey
+    - blue, green, brown, hazel
 
     ### Eye Accents
     - long lashes, eye shadow, eyeliner, mascara, dark eyeliner, dark mascara
@@ -411,7 +416,6 @@ def workflow_v2(shoot_folder="dec24_workflow_test6"):
     - close-up, wide_shot
     - male_focus, female_focus
 
-
     ### Lighting Types
     - cinematic lighting
     - soft lighting
@@ -429,7 +433,7 @@ def workflow_v2(shoot_folder="dec24_workflow_test6"):
     Return XML schema for the image prompts, put each string prompt inside <scene></scene> tags. ONLY use scene tag to contain prompt strings, no other tags.
 
     YOU MUST describe the woman exactly the same (except clothing or nude) only the position, act and perspective should change.  
-    Keep prompting short there is a hard limit of about 35 words (77 tokens).
+    Keep prompting short there is a hard limit of about 35 words (77 tokens). It is CRITICAL to be concise and to the point to stay under the limit.
     """
     
     
@@ -506,9 +510,9 @@ def workflow_v2(shoot_folder="dec24_workflow_test6"):
         img_info['review_result'] = review_result
 
         # INITIAL ANIMATION PROMPT - OPTIMIZED FOR WAN 2.2 I2V MODEL
-        animation_prompt = f"""Analyze this image and created with this prompt: {image_prompt} 
+        animation_prompt = f"""Analyze this explicit image which was created with this prompt: {image_prompt}. Determine if it is a blowjob type images (either active or penis is very close to mouth), or a sexual act (vaginal or anal penitration), or general nudity. 
         
-        Create a prompt to animate the image as a 5 second video clip using the Wan 2.2 I2V model.  Understand what the image is depicting and create a NATURAL LANGUAGE description of how to animate the erotic sexual motion and camera angle to animate.
+        Then create a prompt to animate the image as a 5 second video clip using the Wan 2.2 I2V model.  Understand what the image is depicting and create a NATURAL LANGUAGE description of how to animate the erotic motion and camera angle to animate.
 
 CRITICAL RULES FOR WAN 2.2:
 1. Use NATURAL LANGUAGE descriptions only - NO brackets [word] or parentheses (word) - they have no effect in Wan
@@ -537,7 +541,8 @@ EXAMPLE PROMPTS:
 
 Create a 2-4 sentence animation prompt for this image. Natural language only, describe the erotic sexual motion and camera angle.
 
-Finally, there are two different animation models based on the content.  Add a tag at the end of your prompt for either: <lora>blowjob</lora> or <lora>sex</lora>. Sex is for ALL secene types that are not a form blowjob or situations where the woman's face is near a penis and may become a blowjob."""
+Finally, there are two different animation models based on the content, a general one 'sex' and a specialty 'blowjob'.  Add a tag at the end of your prompt for either: <lora>blowjob</lora> or <lora>sex</lora>. Sex is for ALL secene types that are not a form blowjob or situations where the woman's face is near a penis and may become a blowjob."""
+        
         result = qwen_generate(animation_prompt, images=[img_path])
         print("\n","#"*50)
         print(f"Create movie clip for:  {img_path}")
@@ -956,6 +961,11 @@ def _random_woman():
     return random.choice(women)
 
 if __name__ == "__main__":
+    #set to GPU 1 by default
+    import os
+    os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+    print("CUDA_VISIBLE_DEVICES set to 0")
+    
     start_time = time.time()
     #7.5 Hour RUN TIME LIMIT TEST
     #scenes_count = 5

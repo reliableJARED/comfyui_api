@@ -14,13 +14,14 @@ logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %
 class Qwen25Chat:
     """Qwen2.5 Chat with 4-bit quantization for efficient CUDA inference."""
     
-    def __init__(self, model_id="huihui-ai/Qwen2.5-7B-Instruct-abliterated-v2"):
+    def __init__(self, model_id="huihui-ai/Qwen2.5-7B-Instruct-abliterated-v2",system_prompt=False):
         """Initialize the model with 4-bit quantization."""
         logging.debug(f"Initializing Qwen25Chat with model_id: {model_id}")
         self.model_id = model_id
         self.device = "cuda:0" if torch.cuda.is_available() else "cpu"
         self.dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
-        
+        self.system_prompt = system_prompt
+
         logging.info(f"Using device: {self.device}, dtype: {self.dtype}")
         
         # Enable TF32 for faster computation on Ampere+ GPUs
@@ -32,7 +33,12 @@ class Qwen25Chat:
         # Initialize model and tokenizer
         self._setup_model()
         logging.debug("Initialization complete")
-        
+
+    def set_system_prompt(self, prompt):
+        """Set a system prompt for the model (if applicable)."""
+        logging.debug(f"Setting system prompt: {prompt}")
+        self.system_prompt = prompt
+
     def _setup_model(self):
         """Load model with 4-bit quantization configuration."""
         logging.debug("Setting up model with 4-bit quantization")
@@ -99,7 +105,13 @@ class Qwen25Chat:
 
         logging.debug(f"Generating response for prompt: '{prompt[:50]}...' with streaming={streaming}")
         
-        messages = [{"role": "user", "content": prompt}]
+        if self.system_prompt:
+            messages = [
+                {"role": "system", "content": self.system_prompt},
+                {"role": "user", "content": prompt}
+            ]
+        else:
+            messages = [{"role": "user", "content": prompt}]
         
         # Prepare inputs
         with torch.inference_mode():
@@ -164,6 +176,37 @@ class Qwen25Chat:
             logging.debug("Clearing CUDA cache")
             torch.cuda.empty_cache()
     
+    def api_generate(self, messages=[], max_new_tokens=2048, streaming=False):
+        """API-style generation method."""
+        logging.debug(f"API generate called with messages: {messages}")
+        if not messages:
+            logging.error("No messages provided for API generation. send a list of messages using the format [{'role': 'user'|'assistant'|'system', 'content': '...'}, ...]")
+            return ""
+        
+        if self.system_prompt:
+            #check if system prompt already in messages
+            if not any(msg['role'] == 'system' for msg in messages):
+                #add system prompt at the beginning, based on set system prompt
+                messages.insert(0, {"role": "system", "content": self.system_prompt})
+        
+        # Prepare inputs
+        with torch.inference_mode():
+            logging.debug("Preparing inputs for API generation")
+            inputs = self.tokenizer.apply_chat_template(
+                messages,
+                add_generation_prompt=True,
+                tokenize=True,
+                return_dict=True,
+                return_tensors="pt",
+            ).to(self.model.device)
+            
+            # Standard generation
+            if streaming:
+                return self._generate_streaming(inputs, max_new_tokens)
+            else:
+                return self._generate_standard(inputs, max_new_tokens)
+            
+        
     def chat_loop(self):
         """Interactive terminal chat loop."""
         print("=" * 50)

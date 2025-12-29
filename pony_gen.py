@@ -33,7 +33,7 @@ class PonyImageGenerator:
             use_mps (bool): Use Metal Performance Shaders on Mac (if available)
             use_cuda (bool): Use CUDA if available (None=auto-detect)
         """
-        self.base_model = "Bakanayatsu/Pony-Diffusion-V6-XL-for-Anime"
+        self.base_model = "stablediffusionapi/Pony-Diffusion-V6-XL"#"Bakanayatsu/Pony-Diffusion-V6-XL-for-Anime"
         self.lora_model = "LyliaEngine/Pony_Diffusion_V6_XL"
         
         # Enhanced device configuration for Mac and CUDA

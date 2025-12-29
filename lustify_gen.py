@@ -14,7 +14,6 @@ from PIL import Image
 import uuid
 import os
 from diffusers import DiffusionPipeline, AutoPipelineForInpainting, AutoPipelineForImage2Image
-#from lustify_xwork import ImageGenerator
 
 gpu_count = torch.cuda.device_count()
 print(f"Number of GPUs available: {gpu_count}")
@@ -164,9 +163,17 @@ class ImageGenerator:
                 "use_safetensors": True,
             }
             
-            # Set torch_dtype based on device - SDXL was trained in float16
+            # Set dtype based on model requirements
             if self.is_cuda:
-                kwargs["torch_dtype"] = torch.float16  # Native SDXL precision, best quality + speed
+                print("\n CONFIGURED for CUDA...\n")
+                if self.animated:
+                    print("\n CONFIGURED for ANIME...\n")
+                    # Anime model requires bfloat16 per model card (NOT float16!)
+                    # bfloat16 has larger exponent range, prevents NaN overflow
+                    kwargs["torch_dtype"] = torch.bfloat16
+                    print("✓ Using bfloat16 for anime model (per model card)")
+                else:
+                    kwargs["torch_dtype"] = torch.float16  # Native SDXL precision
             elif self.is_mps:
                 kwargs["torch_dtype"] = torch.float32  # MPS works better with float32
             else:
@@ -183,17 +190,22 @@ class ImageGenerator:
             
             pipe = pipe.to(self.device)
             
-            # Configure scheduler per documentation recommendations (DPM++ 2M SDE with Karras)
+            # Configure scheduler per documentation recommendations
             try:
-                from diffusers import DPMSolverMultistepScheduler
-                pipe.scheduler = DPMSolverMultistepScheduler.from_config(
-                    pipe.scheduler.config,
-                    use_karras_sigmas=True,
-                    algorithm_type="sde-dpmsolver++"  # For DPM++ SDE variant
-                )
-                print("✓ Configured DPM++ 2M SDE scheduler with Karras sigmas")
+                if self.animated:
+                    # Use model's default scheduler (works well with bfloat16)
+                    print("✓ Using default scheduler for anime model")
+                else:
+                    # DPM++ 2M SDE with Karras works well for LUSTIFY
+                    from diffusers import DPMSolverMultistepScheduler
+                    pipe.scheduler = DPMSolverMultistepScheduler.from_config(
+                        pipe.scheduler.config,
+                        use_karras_sigmas=True,
+                        algorithm_type="sde-dpmsolver++"
+                    )
+                    print("✓ Configured DPM++ 2M SDE scheduler with Karras sigmas")
             except Exception as e:
-                print(f"⚠️  Could not configure DPM++ scheduler, using default: {e}")
+                print(f"⚠️  Could not configure scheduler, using default: {e}")
             
             # Device-specific optimizations
             if self.is_cuda:
@@ -357,9 +369,14 @@ class ImageGenerator:
                     with torch.autocast(device_type='cpu', enabled=False):
                         result = pipe(prompt, **generation_kwargs)
                 elif self.is_cuda:
-                    # float16 is SDXL's native precision - best quality and speed
-                    with torch.autocast(device_type='cuda', dtype=torch.float16):
-                        result = pipe(prompt, **generation_kwargs)
+                    if self.animated:
+                        # bfloat16 autocast for anime model
+                        with torch.autocast(device_type='cuda', dtype=torch.bfloat16):
+                            result = pipe(prompt, **generation_kwargs)
+                    else:
+                        # float16 is SDXL's native precision - best quality and speed
+                        with torch.autocast(device_type='cuda', dtype=torch.float16):
+                            result = pipe(prompt, **generation_kwargs)
                 else:
                     # CPU inference
                     result = pipe(prompt, **generation_kwargs)
@@ -451,16 +468,15 @@ class ImageGenerator:
 if __name__ == "__main__":
     # Example usage
     ts = int(time.time())
-    generator = ImageGenerator(use_mps=False, animated=False)
-    prompt = "photograph, real photo missionary_position,1girl, a sexy white skin woman, short face framing red hair, glasses, high cheekbones, full lips, white-eye blue iris, long lashes,32B breast, black mascara, she is lying on her back, 1boy, POV, soft lighting, 8k"
-    #prompt = "nsfw, low_squat hips almost touching the ground,long straight black hair, iris is light purple, angular features, thin black choker necklace, wearing black lace braw, black knee high nylons, pleated black vinyl minis kirt, black high heels. 2.5D realistic animation, front view"
-    #prompt = "nsfw, cosmic background, wide_stance feet planted far apart, chest forward, hips back, long straight black hair, iris is light purple, angular features, thin black choker, black lace braw, black knee high nylons, pleated purple vinyl minis kirt, black high heels. hentai realistic animation, front view"
+    generator = ImageGenerator(use_mps=False, animated=True)
+    #prompt = "photograph, real photo missionary_position,1girl, a sexy white skin woman, short face framing red hair, glasses, high cheekbones, full lips, white-eye blue iris, long lashes,32B breast, black mascara, she is lying on her back, 1boy, POV, soft lighting, 8k"
+    #prompt = "nsfw, she doing a low squat hips almost touching the ground,long straight black hair, iris is light purple, angular features, thin black choker necklace, wearing black lace braw, black knee high nylons, pleated black vinyl minis kirt, black high heels. 2.5D realistic animation, front view"
+    prompt = "A human with a round, friendly face and bright, brown eyes. His skin is tan, and he wears a simple, white tunic with a sash of woven reeds. He carries a woven basket filled with small, glowing stones. 2.5D realistic animation, front view"
 
-    output_path = generator.text_to_image(prompt, output_file=f"{ts}_lustify_gen_test.png")
+    output_path = generator.text_to_image(prompt, output_file=f"{ts}_anime_gen_test.png")
     #save prompt
     prompt_file = output_path.replace(".png", f"{ts}_prompt.txt")
     with open(prompt_file, 'w') as f:
         f.write(prompt)
     print(f"Generated image saved at: {output_path}")
     generator._unload_model()
-    

@@ -669,6 +669,12 @@ if __name__ == "__main__":
     # Example usage
     
     generator = ImageGenerator(use_mps=False, photorealistic=True)
+    output_path = generator.text_to_image("low_squat hips almost touching the ground,long straight black hair, iris is light purple, angular features, thin black choker necklace, wearing black lace braw, black knee high nylons, pleated black vinyl minis kirt, black high heels. 2.5D realistic animation, front view",
+        output_file="chikmix_test_image.png",
+        width=512,
+        height=512,
+        shoot_folder='chikmix'
+    )
     
     # Sample prompt based on ChikMix's strengths (photorealistic portraits)
     # Danbooru tag order: rating -> style -> subject -> features -> clothing -> action -> pose
@@ -692,7 +698,7 @@ if __name__ == "__main__":
         f"{style_tags}, sex, cowgirl_position, {base_char_hetero}, {base_outfit},  girl_on_top, straddling, pov,{lighting_tags}",
         f"{style_tags}, sex, missionary, {base_char_hetero}, {base_outfit},  lying, on_back, spread_legs, pov,{lighting_tags}",
     ]
-    for p in prompt:
+    """for p in prompt:
         ts = int(time.time())
         output_path = generator.text_to_image(
             p, 
@@ -701,11 +707,11 @@ if __name__ == "__main__":
             height=512,  # Portrait orientation
             shoot_folder='chikmix'
         )
-        """prompt_file = f"{ts}_chikmix_prompt.txt"
-        with open(prompt_file, 'w') as f:
-            f.write(prompt)"""
+        #prompt_file = f"{ts}_chikmix_prompt.txt"
+        #with open(prompt_file, 'w') as f:
+        #    f.write(prompt)
         
         if output_path:
-            print(f"Generated image saved at: {output_path}")
+            print(f"Generated image saved at: {output_path}")"""
     
     generator._unload_model()

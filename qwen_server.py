@@ -218,7 +218,6 @@ def generate_t2i():
 def generate():
     global chat_model
     
-
     #UNLOAD OPTION used to unload model after generation to save memory when used with api workflow
     """
     Handle generation request with optional image inputs and model unloading.
@@ -289,10 +288,10 @@ def generate():
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
-    #set to GPU 1 by default
+    #set to GPU 
     import os
-    os.environ["CUDA_VISIBLE_DEVICES"] = "1"
-    print("CUDA_VISIBLE_DEVICES set to 1")
+    os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+    print("CUDA_VISIBLE_DEVICES set to 0")
 
     # Run on 0.0.0.0 to be accessible, port 5055
     # debug=False is important to prevent the reloader from loading the model twice
